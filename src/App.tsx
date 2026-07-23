@@ -7,17 +7,60 @@ import {
   type DragEvent,
   type MouseEvent,
 } from 'react';
-import LocalVideoPlayer from './components/LocalVideoPlayer';
+import LocalMediaPlayer from './components/LocalMediaPlayer';
 import YouTubePlayer from './components/YouTubePlayer';
 import { clamp, extractYouTubeId, formatTime, generateBars } from './lib/time';
 import type { BarSegment, LoopMode, PlayerHandle, SourceType } from './types';
 
 const SPEEDS = [0.5, 0.65, 0.75, 0.85, 1, 1.25, 1.5, 2];
+const SETTINGS_KEY = 'barloop:practice-settings:v2';
+
+interface StoredSettings {
+  bpm: number;
+  beatsPerBar: number;
+  playbackRate: number;
+  loopEnabled: boolean;
+}
 
 interface LocalFileState {
   name: string;
   size: number;
   url: string;
+  kind: 'audio' | 'video';
+  mimeType: string;
+}
+
+const DEFAULT_SETTINGS: StoredSettings = {
+  bpm: 120,
+  beatsPerBar: 4,
+  playbackRate: 1,
+  loopEnabled: true,
+};
+
+function readStoredSettings(): StoredSettings {
+  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(raw) as Partial<StoredSettings>;
+
+    return {
+      bpm: clamp(Math.round(Number(parsed.bpm) || DEFAULT_SETTINGS.bpm), 20, 400),
+      beatsPerBar: [2, 3, 4, 5, 6, 7, 8, 12].includes(Number(parsed.beatsPerBar))
+        ? Number(parsed.beatsPerBar)
+        : DEFAULT_SETTINGS.beatsPerBar,
+      playbackRate: SPEEDS.includes(Number(parsed.playbackRate))
+        ? Number(parsed.playbackRate)
+        : DEFAULT_SETTINGS.playbackRate,
+      loopEnabled:
+        typeof parsed.loopEnabled === 'boolean'
+          ? parsed.loopEnabled
+          : DEFAULT_SETTINGS.loopEnabled,
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
 }
 
 function formatBytes(bytes: number): string {
@@ -25,11 +68,33 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function normalizeBpmInput(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  return String(Number(digits));
+}
+
+function detectMediaKind(file: File): 'audio' | 'video' | null {
+  if (file.type.startsWith('audio/')) return 'audio';
+  if (file.type.startsWith('video/')) return 'video';
+
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (extension && ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'opus'].includes(extension)) {
+    return 'audio';
+  }
+  if (extension && ['mp4', 'webm', 'mov', 'm4v', 'ogv'].includes(extension)) {
+    return 'video';
+  }
+  return null;
+}
+
 function App() {
+  const initialSettingsRef = useRef(readStoredSettings());
   const playerRef = useRef<PlayerHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loopGuardRef = useRef(0);
   const localFileRef = useRef<LocalFileState | null>(null);
+  const tapTimesRef = useRef<number[]>([]);
 
   const [sourceType, setSourceType] = useState<SourceType>('youtube');
   const [youtubeInput, setYoutubeInput] = useState('');
@@ -41,21 +106,25 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1);
+  const [playbackRate, setPlaybackRate] = useState(initialSettingsRef.current.playbackRate);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
-  const [bpm, setBpm] = useState(120);
-  const [beatsPerBar, setBeatsPerBar] = useState(4);
+  const [bpmInput, setBpmInput] = useState(String(initialSettingsRef.current.bpm));
+  const [beatsPerBar, setBeatsPerBar] = useState(initialSettingsRef.current.beatsPerBar);
   const [firstDownbeat, setFirstDownbeat] = useState(0);
   const [bars, setBars] = useState<BarSegment[]>([]);
   const [selectedBarStart, setSelectedBarStart] = useState(0);
   const [selectedBarEnd, setSelectedBarEnd] = useState(0);
+  const [tapCount, setTapCount] = useState(0);
 
   const [loopMode, setLoopMode] = useState<LoopMode>('bars');
-  const [loopEnabled, setLoopEnabled] = useState(true);
+  const [loopEnabled, setLoopEnabled] = useState(initialSettingsRef.current.loopEnabled);
   const [timeLoopStart, setTimeLoopStart] = useState(0);
   const [timeLoopEnd, setTimeLoopEnd] = useState(8);
+  const [loopCount, setLoopCount] = useState(0);
 
+  const bpm = Number(bpmInput);
   const hasActiveSource = sourceType === 'youtube' ? Boolean(youtubeVideoId) : Boolean(localFile);
 
   const selectedBars = useMemo(() => {
@@ -80,6 +149,11 @@ function App() {
     };
   }, [duration, loopMode, selectedBars, timeLoopEnd, timeLoopStart]);
 
+  const clearMessages = () => {
+    setError('');
+    setNotice('');
+  };
+
   const resetPlaybackState = useCallback(() => {
     playerRef.current?.pause();
     setIsReady(false);
@@ -91,7 +165,9 @@ function App() {
     setSelectedBarEnd(0);
     setTimeLoopStart(0);
     setTimeLoopEnd(8);
+    setLoopCount(0);
     setError('');
+    setNotice('');
   }, []);
 
   const switchSource = (nextSource: SourceType) => {
@@ -108,8 +184,10 @@ function App() {
     setTimeLoopEnd(Math.min(8, safeDuration));
     setFirstDownbeat(0);
     setBars([]);
+    setLoopCount(0);
     setIsReady(true);
     setError('');
+    setNotice('미디어를 불러왔습니다. 첫 박자를 맞춘 뒤 마디를 나눠 보세요.');
   }, []);
 
   const handlePlayingChange = useCallback((playing: boolean) => {
@@ -118,6 +196,7 @@ function App() {
 
   const handlePlayerError = useCallback((message: string) => {
     setError(message);
+    setNotice('');
     setIsReady(false);
     setIsPlaying(false);
   }, []);
@@ -132,6 +211,20 @@ function App() {
     },
     [],
   );
+
+  useEffect(() => {
+    const settings: StoredSettings = {
+      bpm: Number.isFinite(bpm) && bpm > 0 ? bpm : DEFAULT_SETTINGS.bpm,
+      beatsPerBar,
+      playbackRate,
+      loopEnabled,
+    };
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }, [beatsPerBar, bpm, loopEnabled, playbackRate]);
+
+  useEffect(() => {
+    setLoopCount(0);
+  }, [activeLoop.end, activeLoop.start, loopMode]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -163,6 +256,7 @@ function App() {
           player.seekTo(activeLoop.start);
           void player.play();
           setCurrentTime(activeLoop.start);
+          setLoopCount((count) => count + 1);
         }
       }
 
@@ -205,10 +299,10 @@ function App() {
         togglePlayback();
       } else if (event.code === 'ArrowLeft') {
         event.preventDefault();
-        seekBy(-5);
+        seekBy(event.shiftKey ? -0.1 : -5);
       } else if (event.code === 'ArrowRight') {
         event.preventDefault();
-        seekBy(5);
+        seekBy(event.shiftKey ? 0.1 : 5);
       } else if (event.key.toLowerCase() === 'l') {
         setLoopEnabled((enabled) => !enabled);
       } else if (event.key === '[') {
@@ -228,31 +322,34 @@ function App() {
     const videoId = extractYouTubeId(youtubeInput);
     if (!videoId) {
       setError('올바른 YouTube URL 또는 11자리 영상 ID를 입력해 주세요.');
+      setNotice('');
       return;
     }
 
     resetPlaybackState();
     setYoutubeVideoId(videoId);
-    setError('');
   };
 
   const loadLocalFile = (file: File) => {
-    if (!file.type.startsWith('video/')) {
-      setError('영상 파일만 선택할 수 있습니다.');
+    const kind = detectMediaKind(file);
+    if (!kind) {
+      setError('재생 가능한 영상 또는 음원 파일을 선택해 주세요.');
+      setNotice('');
       return;
     }
 
     resetPlaybackState();
     if (localFileRef.current) URL.revokeObjectURL(localFileRef.current.url);
 
-    const nextFile = {
+    const nextFile: LocalFileState = {
       name: file.name,
       size: file.size,
       url: URL.createObjectURL(file),
+      kind,
+      mimeType: file.type || 'unknown',
     };
     localFileRef.current = nextFile;
     setLocalFile(nextFile);
-    setError('');
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -262,13 +359,54 @@ function App() {
     if (file) loadLocalFile(file);
   };
 
+  const handleBpmChange = (value: string) => {
+    setBpmInput(normalizeBpmInput(value));
+    clearMessages();
+  };
+
+  const finalizeBpm = () => {
+    const safeBpm = clamp(Math.round(Number(bpmInput) || DEFAULT_SETTINGS.bpm), 20, 400);
+    setBpmInput(String(safeBpm));
+  };
+
+  const adjustBpm = (amount: number) => {
+    const safeBpm = clamp(Math.round(Number(bpmInput) || DEFAULT_SETTINGS.bpm) + amount, 20, 400);
+    setBpmInput(String(safeBpm));
+    clearMessages();
+  };
+
+  const tapTempo = () => {
+    const now = performance.now();
+    const previous = tapTimesRef.current.at(-1);
+    let times = tapTimesRef.current;
+
+    if (!previous || now - previous > 2500) times = [];
+    times = [...times, now].slice(-8);
+    tapTimesRef.current = times;
+    setTapCount(times.length);
+
+    if (times.length >= 2) {
+      const intervals = times.slice(1).map((time, index) => time - times[index]);
+      const averageInterval = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
+      const tappedBpm = clamp(Math.round(60000 / averageInterval), 20, 400);
+      setBpmInput(String(tappedBpm));
+      setNotice(`${times.length}회 탭 평균으로 ${tappedBpm} BPM을 설정했습니다.`);
+      setError('');
+    } else {
+      setNotice('리듬에 맞춰 두 번 이상 탭해 주세요.');
+      setError('');
+    }
+  };
+
   const generateBarSegments = () => {
     if (!isReady || duration <= 0) {
-      setError('영상을 먼저 불러와 주세요.');
+      setError('영상 또는 음원을 먼저 불러와 주세요.');
+      setNotice('');
       return;
     }
-    if (bpm < 20 || bpm > 400) {
+    if (!Number.isFinite(bpm) || bpm < 20 || bpm > 400) {
       setError('BPM은 20~400 사이로 입력해 주세요.');
+      setNotice('');
       return;
     }
 
@@ -277,7 +415,9 @@ function App() {
     setSelectedBarStart(0);
     setSelectedBarEnd(0);
     setLoopMode('bars');
+    setLoopCount(0);
     setError(nextBars.length ? '' : '마디를 생성할 수 없습니다. 설정값을 확인해 주세요.');
+    setNotice(nextBars.length ? `${nextBars.length}개 마디를 생성했습니다.` : '');
     if (nextBars[0]) seekTo(nextBars[0].start);
   };
 
@@ -296,9 +436,8 @@ function App() {
   const moveBarSelection = (direction: -1 | 1) => {
     if (!selectedBars || bars.length === 0) return;
     const selectionLength = selectedBars.endIndex - selectedBars.startIndex;
-    const nextStart = Math.floor(
-      clamp(selectedBars.startIndex + direction, 0, bars.length - selectionLength - 1),
-    );
+    const maxStart = Math.max(0, bars.length - selectionLength - 1);
+    const nextStart = Math.floor(clamp(selectedBars.startIndex + direction, 0, maxStart));
     const nextEnd = nextStart + selectionLength;
     setSelectedBarStart(nextStart);
     setSelectedBarEnd(nextEnd);
@@ -321,6 +460,25 @@ function App() {
     }
   };
 
+  const resetPracticeSettings = () => {
+    setBpmInput(String(DEFAULT_SETTINGS.bpm));
+    setBeatsPerBar(DEFAULT_SETTINGS.beatsPerBar);
+    setPlaybackRate(DEFAULT_SETTINGS.playbackRate);
+    playerRef.current?.setPlaybackRate(DEFAULT_SETTINGS.playbackRate);
+    setLoopEnabled(DEFAULT_SETTINGS.loopEnabled);
+    setFirstDownbeat(0);
+    setBars([]);
+    setSelectedBarStart(0);
+    setSelectedBarEnd(0);
+    setTimeLoopStart(0);
+    setTimeLoopEnd(Math.min(8, duration || 8));
+    setLoopCount(0);
+    tapTimesRef.current = [];
+    setTapCount(0);
+    setError('');
+    setNotice('연습 설정을 기본값으로 초기화했습니다.');
+  };
+
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const loopLeft = duration > 0 ? (activeLoop.start / duration) * 100 : 0;
   const loopWidth =
@@ -334,17 +492,17 @@ function App() {
             <span className="brand-mark" aria-hidden="true">B</span>
             <h1>BarLoop</h1>
           </div>
-          <p>YouTube와 내 영상을 마디 단위로 반복 연습하세요.</p>
+          <p>YouTube·영상·음원을 원하는 구간만 반복해서 연습하세요.</p>
         </div>
         <div className="privacy-badge" title="로컬 파일은 서버로 전송되지 않습니다.">
           <span aria-hidden="true">🔒</span>
-          로컬 영상은 브라우저에서만 처리
+          로컬 파일은 브라우저에서만 처리
         </div>
       </header>
 
       <main>
         <section className="panel source-panel">
-          <div className="source-tabs" role="tablist" aria-label="영상 소스">
+          <div className="source-tabs" role="tablist" aria-label="미디어 소스">
             <button
               type="button"
               className={sourceType === 'youtube' ? 'source-tab active' : 'source-tab'}
@@ -357,7 +515,7 @@ function App() {
               className={sourceType === 'local' ? 'source-tab active' : 'source-tab'}
               onClick={() => switchSource('local')}
             >
-              로컬 영상
+              내 영상·음원
             </button>
           </div>
 
@@ -377,7 +535,7 @@ function App() {
                 />
               </div>
               <button type="button" className="primary-button load-button" onClick={loadYouTubeVideo}>
-                영상 불러오기
+                불러오기
               </button>
             </div>
           ) : (
@@ -401,7 +559,7 @@ function App() {
                 ref={fileInputRef}
                 className="visually-hidden"
                 type="file"
-                accept="video/*"
+                accept="video/*,audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.opus,.mp4,.webm,.mov,.m4v"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) loadLocalFile(file);
@@ -411,19 +569,25 @@ function App() {
               <span className="drop-icon" aria-hidden="true">＋</span>
               {localFile ? (
                 <div>
-                  <strong>{localFile.name}</strong>
+                  <div className="file-title-row">
+                    <strong>{localFile.name}</strong>
+                    <span className="media-kind-badge">
+                      {localFile.kind === 'audio' ? '음원' : '영상'}
+                    </span>
+                  </div>
                   <p>{formatBytes(localFile.size)} · 클릭하여 다른 파일 선택</p>
                 </div>
               ) : (
                 <div>
-                  <strong>영상을 끌어다 놓거나 클릭해 선택</strong>
-                  <p>파일은 업로드되지 않으며 현재 브라우저에서만 열립니다.</p>
+                  <strong>영상이나 음원을 끌어다 놓거나 클릭해 선택</strong>
+                  <p>MP4, WebM, MP3, WAV, M4A 등 브라우저 지원 형식을 사용할 수 있습니다.</p>
                 </div>
               )}
             </div>
           )}
 
-          {error && <div className="error-banner" role="alert">{error}</div>}
+          {error && <div className="message-banner error" role="alert">{error}</div>}
+          {notice && !error && <div className="message-banner notice">{notice}</div>}
         </section>
 
         <div className="workspace-grid">
@@ -432,8 +596,8 @@ function App() {
               {!hasActiveSource && (
                 <div className="empty-player">
                   <div className="empty-player-icon">▶</div>
-                  <strong>연습할 영상을 불러와 주세요</strong>
-                  <span>YouTube 링크 또는 내 컴퓨터의 영상 파일을 사용할 수 있습니다.</span>
+                  <strong>연습할 미디어를 불러와 주세요</strong>
+                  <span>YouTube 링크, 내 컴퓨터의 영상 또는 음원 파일을 사용할 수 있습니다.</span>
                 </div>
               )}
 
@@ -450,10 +614,12 @@ function App() {
               )}
 
               {sourceType === 'local' && localFile && (
-                <LocalVideoPlayer
+                <LocalMediaPlayer
                   key={localFile.url}
                   ref={playerRef}
                   src={localFile.url}
+                  name={localFile.name}
+                  kind={localFile.kind}
                   playbackRate={playbackRate}
                   onReady={handleReady}
                   onPlayingChange={handlePlayingChange}
@@ -492,15 +658,25 @@ function App() {
             </div>
 
             <div className="transport-row">
-              <button type="button" className="icon-button" disabled={!isReady} onClick={() => seekBy(-5)}>
-                −5초
-              </button>
+              <div className="transport-group">
+                <button type="button" className="icon-button" disabled={!isReady} onClick={() => seekBy(-5)}>
+                  −5초
+                </button>
+                <button type="button" className="fine-button" disabled={!isReady} onClick={() => seekBy(-0.1)}>
+                  −0.1
+                </button>
+              </div>
               <button type="button" className="play-button" disabled={!isReady} onClick={togglePlayback}>
                 {isPlaying ? '❚❚' : '▶'}
               </button>
-              <button type="button" className="icon-button" disabled={!isReady} onClick={() => seekBy(5)}>
-                +5초
-              </button>
+              <div className="transport-group">
+                <button type="button" className="fine-button" disabled={!isReady} onClick={() => seekBy(0.1)}>
+                  +0.1
+                </button>
+                <button type="button" className="icon-button" disabled={!isReady} onClick={() => seekBy(5)}>
+                  +5초
+                </button>
+              </div>
               <button
                 type="button"
                 className={loopEnabled ? 'loop-toggle active' : 'loop-toggle'}
@@ -508,6 +684,9 @@ function App() {
                 onClick={() => setLoopEnabled((enabled) => !enabled)}
               >
                 ↻ 반복 {loopEnabled ? 'ON' : 'OFF'}
+              </button>
+              <button type="button" className="loop-count" disabled={!isReady} onClick={() => setLoopCount(0)}>
+                반복 {loopCount}회 · 초기화
               </button>
             </div>
 
@@ -539,20 +718,27 @@ function App() {
                   <span className="eyebrow">STEP 1</span>
                   <h2>마디 설정</h2>
                 </div>
-                <span className="subtle">BPM 기준 자동 계산</span>
+                <span className="subtle">설정은 자동 저장됩니다</span>
               </div>
 
               <div className="settings-grid">
                 <div className="field">
                   <label htmlFor="bpm">BPM</label>
-                  <input
-                    id="bpm"
-                    type="number"
-                    min={20}
-                    max={400}
-                    value={bpm}
-                    onChange={(event) => setBpm(Number(event.target.value))}
-                  />
+                  <div className="number-stepper">
+                    <button type="button" onClick={() => adjustBpm(-1)} aria-label="BPM 1 감소">−</button>
+                    <input
+                      id="bpm"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={bpmInput}
+                      onChange={(event) => handleBpmChange(event.target.value)}
+                      onBlur={finalizeBpm}
+                      aria-describedby="bpm-help"
+                    />
+                    <button type="button" onClick={() => adjustBpm(1)} aria-label="BPM 1 증가">＋</button>
+                  </div>
+                  <span id="bpm-help" className="field-help">앞자리 0 없이 20~400</span>
                 </div>
                 <div className="field">
                   <label htmlFor="beats">한 마디의 박자</label>
@@ -565,6 +751,16 @@ function App() {
                       <option key={value} value={value}>{value}박</option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              <div className="tap-tempo-row">
+                <button type="button" className="secondary-button" onClick={tapTempo}>
+                  탭 템포
+                </button>
+                <div>
+                  <strong>리듬에 맞춰 클릭</strong>
+                  <span>{tapCount > 0 ? `${tapCount}회 입력됨` : '2회 이상 탭하면 BPM 자동 계산'}</span>
                 </div>
               </div>
 
@@ -772,12 +968,24 @@ function App() {
                 </div>
               )}
             </section>
+
+            <section className="panel utility-panel">
+              <div>
+                <span className="eyebrow">TOOLS</span>
+                <h2>연습 도구</h2>
+              </div>
+              <p>BPM, 박자, 속도와 반복 설정은 이 브라우저에 자동 저장됩니다.</p>
+              <button type="button" className="secondary-button full-width" onClick={resetPracticeSettings}>
+                연습 설정 초기화
+              </button>
+            </section>
           </aside>
         </div>
 
         <section className="shortcut-strip">
           <span><kbd>Space</kbd> 재생/정지</span>
           <span><kbd>←</kbd><kbd>→</kbd> 5초 이동</span>
+          <span><kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 0.1초 이동</span>
           <span><kbd>L</kbd> 반복 ON/OFF</span>
           <span><kbd>[</kbd> A 지점</span>
           <span><kbd>]</kbd> B 지점</span>
@@ -785,7 +993,7 @@ function App() {
       </main>
 
       <footer>
-        <p>로컬 영상은 서버에 업로드하거나 저장하지 않습니다. 브라우저가 지원하는 코덱만 재생할 수 있습니다.</p>
+        <p>로컬 영상과 음원은 서버에 업로드하거나 저장하지 않습니다. 브라우저가 지원하는 코덱만 재생할 수 있습니다.</p>
       </footer>
     </div>
   );
