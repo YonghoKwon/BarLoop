@@ -31,3 +31,4 @@ jobs:
           git add -A
           git commit -m "Integrate drummer practice suite"
           git push origin HEAD:agent/drummer-practice-suite
+# Trigger source materialization.
