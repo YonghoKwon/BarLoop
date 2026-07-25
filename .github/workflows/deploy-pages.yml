@@ -28,8 +28,8 @@ jobs:
           if [ -f .source/integration.tar.gz ]; then
             tar -xzf .source/integration.tar.gz
           fi
-          if [ -f .source/mobile.tar.gz ]; then
-            tar -xzf .source/mobile.tar.gz
+          if [ -f .source/styles.css.gz ]; then
+            gzip -dc .source/styles.css.gz > src/styles.css
           fi
       - name: Commit clean source on main
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
