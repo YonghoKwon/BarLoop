@@ -1,0 +1,11 @@
+{
+  "name": "BarLoop Drummer Practice",
+  "short_name": "BarLoop",
+  "description": "드러머를 위한 구간 반복·메트로놈·템포 연습 도구",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090b10",
+  "theme_color": "#090b10",
+  "orientation": "any"
+}
