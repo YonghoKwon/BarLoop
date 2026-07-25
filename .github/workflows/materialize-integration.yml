@@ -1,0 +1,33 @@
+name: Materialize integrated source
+
+on:
+  push:
+    branches: [agent/drummer-practice-suite]
+    paths:
+      - '.source/integration.tar.gz'
+      - '.github/workflows/materialize-integration.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/drummer-practice-suite
+          fetch-depth: 0
+      - name: Extract integrated source
+        run: |
+          tar -xzf .source/integration.tar.gz
+          rm -f .source/integration.tar.gz
+          rmdir .source 2>/dev/null || true
+          rm -f .github/workflows/materialize-integration.yml
+      - name: Commit integrated application
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Integrate drummer practice suite"
+          git push origin HEAD:agent/drummer-practice-suite
