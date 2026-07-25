@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { PlayerCallbacks, PlayerHandle } from '../types';
 
 interface LocalMediaPlayerProps extends PlayerCallbacks {
@@ -6,11 +6,13 @@ interface LocalMediaPlayerProps extends PlayerCallbacks {
   name: string;
   kind: 'audio' | 'video';
   playbackRate: number;
+  preservePitch: boolean;
 }
 
 const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
-  ({ src, name, kind, playbackRate, onReady, onPlayingChange, onError }, ref) => {
+  ({ src, name, kind, playbackRate, preservePitch, onReady, onPlayingChange, onError }, ref) => {
     const mediaRef = useRef<HTMLMediaElement | null>(null);
+    const [playing, setPlaying] = useState(false);
 
     useImperativeHandle(
       ref,
@@ -30,8 +32,16 @@ const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
     );
 
     useEffect(() => {
-      if (mediaRef.current) mediaRef.current.playbackRate = playbackRate;
-    }, [playbackRate]);
+      const media = mediaRef.current;
+      if (!media) return;
+      media.playbackRate = playbackRate;
+      media.preservesPitch = preservePitch;
+    }, [playbackRate, preservePitch]);
+
+    const updatePlaying = (next: boolean) => {
+      setPlaying(next);
+      onPlayingChange(next);
+    };
 
     const togglePlayback = () => {
       const media = mediaRef.current;
@@ -42,6 +52,7 @@ const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
 
     const handleLoadedMetadata = (media: HTMLMediaElement) => {
       media.playbackRate = playbackRate;
+      media.preservesPitch = preservePitch;
       onReady(media.duration);
     };
 
@@ -58,8 +69,8 @@ const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
           <button type="button" className="audio-visual" onClick={togglePlayback}>
             <span className="audio-icon" aria-hidden="true">♪</span>
             <strong>{name}</strong>
-            <span>{mediaRef.current?.paused === false ? '재생 중 · 클릭하여 일시정지' : '클릭하여 재생'}</span>
-            <div className="audio-bars" aria-hidden="true">
+            <span>{playing ? '재생 중 · 탭하여 일시정지' : '탭하여 재생'}</span>
+            <div className={playing ? 'audio-bars playing' : 'audio-bars'} aria-hidden="true">
               {Array.from({ length: 18 }, (_, index) => <i key={index} />)}
             </div>
           </button>
@@ -70,9 +81,9 @@ const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
             src={src}
             preload="metadata"
             onLoadedMetadata={(event) => handleLoadedMetadata(event.currentTarget)}
-            onPlay={() => onPlayingChange(true)}
-            onPause={() => onPlayingChange(false)}
-            onEnded={() => onPlayingChange(false)}
+            onPlay={() => updatePlaying(true)}
+            onPause={() => updatePlaying(false)}
+            onEnded={() => updatePlaying(false)}
             onError={sharedError}
           />
         </div>
@@ -90,9 +101,9 @@ const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
         playsInline
         onClick={togglePlayback}
         onLoadedMetadata={(event) => handleLoadedMetadata(event.currentTarget)}
-        onPlay={() => onPlayingChange(true)}
-        onPause={() => onPlayingChange(false)}
-        onEnded={() => onPlayingChange(false)}
+        onPlay={() => updatePlaying(true)}
+        onPause={() => updatePlaying(false)}
+        onEnded={() => updatePlaying(false)}
         onError={sharedError}
       />
     );
