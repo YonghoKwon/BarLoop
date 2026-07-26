@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import AccentFlashControls from '../components/AccentFlashControls';
 import BpmNumberInput from '../components/BpmNumberInput';
 import DrummerTrainingSuite from '../components/DrummerTrainingSuite';
 import { preparePlaybackAudioSession, releasePlaybackAudioSession } from '../lib/audioPlaybackSession';
+import {
+  DEFAULT_ACCENT_FLASH_SETTINGS,
+  accentFlashClassName,
+  accentFlashInlineStyle,
+  normalizeAccentFlashSettings,
+  type AccentFlashSettings,
+} from '../lib/accentFlash';
 import { clampBpm } from '../lib/bpm';
 import {
   DEFAULT_CUSTOM_PATTERN,
@@ -40,6 +48,7 @@ interface StoredTrainingSettings {
   movingAccentStep: number;
   routineSteps: PracticeRoutineStep[];
   accentFlashEnabled: boolean;
+  accentFlash: AccentFlashSettings;
 }
 
 const DEFAULTS: StoredTrainingSettings = {
@@ -53,6 +62,7 @@ const DEFAULTS: StoredTrainingSettings = {
   movingAccentStep: 0,
   routineSteps: DEFAULT_ROUTINE,
   accentFlashEnabled: true,
+  accentFlash: DEFAULT_ACCENT_FLASH_SETTINGS,
 };
 
 function normalizeRoutine(value: unknown): PracticeRoutineStep[] {
@@ -87,6 +97,7 @@ function readSettings(): StoredTrainingSettings {
       movingAccentStep: Math.min(totalSteps - 1, Math.max(0, Math.round(Number(stored.movingAccentStep) || 0))),
       routineSteps: normalizeRoutine(stored.routineSteps),
       accentFlashEnabled: stored.accentFlashEnabled !== false,
+      accentFlash: normalizeAccentFlashSettings(stored.accentFlash),
     };
   } catch {
     return DEFAULTS;
@@ -127,6 +138,7 @@ export default function DrummerTrainingPage() {
   const [routineIndex, setRoutineIndex] = useState(0);
   const [routineBarInStep, setRoutineBarInStep] = useState(0);
   const [accentFlashEnabled, setAccentFlashEnabled] = useState(initial.accentFlashEnabled);
+  const [accentFlash, setAccentFlash] = useState<AccentFlashSettings>(normalizeAccentFlashSettings(initial.accentFlash));
   const [running, setRunning] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [beatInBar, setBeatInBar] = useState(0);
@@ -183,8 +195,9 @@ export default function DrummerTrainingPage() {
       movingAccentStep,
       routineSteps,
       accentFlashEnabled,
+      accentFlash,
     }));
-  }, [accentEveryBars, accentFlashEnabled, accentMode, accentTrainerEnabled, bpm, movingAccentStep, pattern, rhythmEnabled, routineSteps, volume]);
+  }, [accentEveryBars, accentFlash, accentFlashEnabled, accentMode, accentTrainerEnabled, bpm, movingAccentStep, pattern, rhythmEnabled, routineSteps, volume]);
 
   useEffect(() => engineRef.current.update(settings), [settings]);
 
@@ -342,7 +355,7 @@ export default function DrummerTrainingPage() {
           <div className="training-meter-status"><strong>{pattern.beatsPerBar}/4</strong><span>{groupingLabel(pattern.beatsPerBar)} 묶음 · {totalSteps}칸</span></div>
 
           <div className="training-orbit">
-            {accentFlashEnabled && flashPulse > 0 && <i key={flashPulse} className="accent-flash-wave" />}
+            {accentFlashEnabled && flashPulse > 0 && <i key={flashPulse} data-testid="accent-flash-effect" className={accentFlashClassName('', accentFlash)} style={accentFlashInlineStyle(accentFlash)} />}
             <strong>{countLabel(activeStep)}</strong>
             <span>{pattern.name}</span>
           </div>
@@ -361,7 +374,7 @@ export default function DrummerTrainingPage() {
                 <section>
                   {[String(beatIndex + 1), 'e', '&', 'a'].map((label, subIndex) => {
                     const step = beatIndex * 4 + subIndex;
-                    return <span key={`${beatIndex}-${label}`} className={[subIndex > 0 ? 'offbeat' : 'downbeat', step === activeStep ? 'active' : ''].filter(Boolean).join(' ')}>{label}</span>;
+                    return <span key={`${beatIndex}-${label}`} className={[subIndex === 0 ? 'downbeat' : subIndex === 2 ? 'eighth-offbeat' : 'sixteenth-between', step === activeStep ? 'active' : ''].filter(Boolean).join(' ')}>{label}</span>;
                   })}
                 </section>
               </div>
@@ -377,7 +390,7 @@ export default function DrummerTrainingPage() {
 
         <section className="panel training-quick-settings">
           <div className="section-title-row"><h2>빠른 설정</h2><span>{pattern.beatsPerBar}/4 · 16분음표 · {groupingLabel(pattern.beatsPerBar)}</span></div>
-          <div className="compact-grid four training-settings-grid">
+          <div className="compact-grid three training-settings-grid">
             <label>한 마디 박자
               <select value={pattern.beatsPerBar} onChange={(event) => changeBeatsPerBar(Number(event.target.value))}>
                 {Array.from({ length: 11 }, (_, index) => index + 2).map((value) => <option key={value} value={value}>{value}/4 · {value * 4}칸</option>)}
@@ -389,8 +402,17 @@ export default function DrummerTrainingPage() {
                 {SWING_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
-            <label className="flash-toggle-card"><span>강세 화면 플래시</span><input type="checkbox" checked={accentFlashEnabled} onChange={(event) => setAccentFlashEnabled(event.target.checked)} /></label>
           </div>
+        </section>
+
+        <section className="panel training-accent-settings">
+          <AccentFlashControls
+            enabled={accentFlashEnabled}
+            settings={accentFlash}
+            onEnabledChange={setAccentFlashEnabled}
+            onSettingsChange={setAccentFlash}
+            onPreview={() => { setAccentFlashEnabled(true); setFlashPulse((value) => value + 1); }}
+          />
         </section>
 
         <DrummerTrainingSuite

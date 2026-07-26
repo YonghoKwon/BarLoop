@@ -313,3 +313,53 @@
 @media (prefers-reduced-motion: reduce) {
   .meter-overview-group i.active { box-shadow: none; }
 }
+
+
+/* Clear hierarchy: downbeat -> eighth-note offbeat (&) -> sixteenth-note in-between (e/a). */
+.syncopation-explainer {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0 0 12px;
+}
+.syncopation-explainer > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #343d4e;
+  border-radius: 11px;
+  background: #111620;
+}
+.syncopation-explainer strong { font: 800 .78rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+.syncopation-explainer span { color: #8f9caf; font-size: .66rem; line-height: 1.4; }
+.syncopation-explainer .downbeat-card { border-left: 3px solid #ff8f66; }
+.syncopation-explainer .eighth-card { border-left: 3px solid #5aa6ff; background: rgba(75,145,255,.08); }
+.syncopation-explainer .sixteenth-card { border-left: 3px solid #69778d; }
+.legend-dot.downbeat { background: #ff8f66; }
+.legend-dot.eighth-offbeat { background: #5aa6ff; box-shadow: 0 0 8px rgba(90,166,255,.45); }
+.legend-dot.sixteenth-between { border: 1px dashed #69778d; background: rgba(105,119,141,.14); }
+.drum-substep-labels span.downbeat-label { color: #f0a186; }
+.drum-substep-labels span.eighth-offbeat-label { color: #75b7ff; font-weight: 900; }
+.drum-substep-labels span.sixteenth-between-label { color: #7e8b9e; }
+.drum-substep-grid button.eighth-offbeat-cell:not(.on):not(.accent) {
+  border-color: rgba(90,166,255,.68);
+  background: rgba(75,145,255,.14);
+}
+.drum-substep-grid button.sixteenth-between-cell:not(.on):not(.accent) {
+  border-style: dashed;
+  border-color: #35445a;
+  background: #151c27;
+}
+.training-measure-guide span.eighth-offbeat:not(.active) {
+  background: rgba(75,145,255,.16);
+  color: #83bdff;
+  font-weight: 900;
+}
+.training-measure-guide span.sixteenth-between:not(.active) {
+  background: rgba(54,66,84,.24);
+  color: #7e8b9e;
+}
+@media (max-width: 760px) {
+  .syncopation-explainer { grid-template-columns: 1fr; }
+}
