@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import BpmNumberInput from '../components/BpmNumberInput';
 import { preparePlaybackAudioSession, releasePlaybackAudioSession } from '../lib/audioPlaybackSession';
 import { clampBpm } from '../lib/bpm';
@@ -125,6 +125,23 @@ function formatClock(seconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
+function meterGroups(beatsPerBar: number): number[] {
+  const known: Record<number, number[]> = {
+    2: [2],
+    3: [3],
+    4: [4],
+    5: [3, 2],
+    6: [3, 3],
+    7: [4, 3],
+    8: [4, 4],
+    9: [3, 3, 3],
+    10: [5, 5],
+    11: [4, 4, 3],
+    12: [4, 4, 4],
+  };
+  return known[beatsPerBar] ?? [beatsPerBar];
+}
+
 export default function MetronomePage() {
   const initial = useRef(readSettings()).current;
   const engineRef = useRef(new StandaloneMetronomeEngine());
@@ -206,6 +223,7 @@ export default function MetronomePage() {
   }, [accentFlashEnabled, countMode, presetIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]);
 
   useEffect(() => engineRef.current.update(engineSettings), [engineSettings]);
+
   useEffect(() => {
     setAccents((current) => Array.from({ length: beatsPerBar }, (_, index) => current[index] ?? index === 0));
     setBeatInBar(0);
@@ -304,6 +322,15 @@ export default function MetronomePage() {
   const activeVisualIndex = getVisualSubdivisionIndex(subdivision, subdivisionInBeat);
   const progress = timerMinutes > 0 ? Math.min(100, elapsedSeconds / (timerMinutes * 60) * 100) : 0;
   const selectedSound = SOUND_OPTIONS.find((item) => item.value === sound) ?? SOUND_OPTIONS[0];
+  const grouping = meterGroups(beatsPerBar);
+  const guideStyle = { '--meter-columns': Math.min(4, beatsPerBar) } as CSSProperties;
+
+  let beatCursor = 0;
+  const groupedBeats = grouping.map((groupSize, groupIndex) => {
+    const start = beatCursor;
+    beatCursor += groupSize;
+    return { groupSize, groupIndex, beats: Array.from({ length: groupSize }, (_, index) => start + index) };
+  });
 
   return (
     <div className="metronome-lab-page">
@@ -312,23 +339,48 @@ export default function MetronomePage() {
           <button type="button" className="secondary-button" onClick={() => { window.location.hash = ''; }}>← 영상 연습</button>
           <button type="button" className="secondary-button" onClick={() => { window.location.hash = 'drummer-training'; }}>드럼 트레이닝</button>
         </div>
-        <div><span className="eyebrow">BARLOOP LAB</span><h1>드러머 메트로놈</h1><p>클릭·카운트·Gap Click·템포 훈련에 집중하는 독립 메트로놈</p></div>
+        <div><span className="eyebrow">BARLOOP LAB</span><h1>드러머 메트로놈</h1><p>2~12박 클릭·카운트·Gap Click·템포 훈련에 집중하는 독립 메트로놈</p></div>
         <div className={running ? 'lab-live active' : 'lab-live'}>{running ? 'RUNNING' : 'READY'}</div>
       </header>
 
       <main className="lab-layout">
         <section className="lab-stage panel">
+          <div className="meter-stage-status"><strong>{beatsPerBar}/4</strong><span>{grouping.join('+')} 묶음</span></div>
           <div className={audible ? 'beat-orbit' : 'beat-orbit muted'}>
             {accentFlashEnabled && flashPulse > 0 && <i key={flashPulse} className="accent-flash-wave metronome-flash" />}
             <div className="beat-number current-count-position">{currentCount}</div>
             <span>{audible ? (countMode === 'voice' ? 'VOICE' : countMode === 'both' ? 'BOTH' : 'CLICK') : 'GAP'}</span>
           </div>
           <div className="lab-bpm-row"><button type="button" onClick={() => setBpm((value) => clampBpm(value - 1))}>−</button><div className="lab-bpm-input"><BpmNumberInput value={bpm} onChange={setBpm} ariaLabel="메트로놈 BPM" /><strong>BPM</strong></div><button type="button" onClick={() => setBpm((value) => clampBpm(value + 1))}>＋</button></div>
-          <div className="beat-dots" aria-label="현재 박자">{Array.from({ length: beatsPerBar }, (_, index) => <i key={index} className={index === beatInBar ? 'active' : ''} />)}</div>
-          <div className="subdivision-meter">{Array.from({ length: subdivision }, (_, index) => <i key={index} className={index === subdivisionInBeat ? 'active' : ''} />)}</div>
-          <div className={beatsPerBar <= 4 ? 'subdivision-count-guide fit-full-bar' : 'subdivision-count-guide'} aria-label="한 마디 서브디비전 카운트">
-            {groups.map((labels, beatIndex) => <div key={beatIndex} className={beatIndex === beatInBar ? 'count-beat-group active-beat' : 'count-beat-group'}>{labels.map((label, subIndex) => <span key={`${beatIndex}-${subIndex}`} className={[isSubdivisionSoundCell(subdivision, subIndex) ? 'sound-on' : 'guide-only', beatIndex === beatInBar && subIndex === activeVisualIndex ? 'active' : ''].filter(Boolean).join(' ')}>{label}</span>)}</div>)}
+
+          <div className="meter-progress-readout">현재 <strong>{beatInBar + 1}</strong> / {beatsPerBar}박</div>
+          <div className="meter-group-overview" aria-label="현재 박자">
+            {groupedBeats.map(({ groupIndex, groupSize, beats }) => (
+              <section key={groupIndex} className="meter-overview-group">
+                <b>{groupSize}박 묶음</b>
+                <div>{beats.map((beatIndex) => <i key={beatIndex} className={beatIndex === beatInBar ? 'active' : ''}>{beatIndex + 1}</i>)}</div>
+              </section>
+            ))}
           </div>
+
+          <div className="subdivision-meter">{Array.from({ length: subdivision }, (_, index) => <i key={index} className={index === subdivisionInBeat ? 'active' : ''} />)}</div>
+          <div className="subdivision-count-guide variable-meter-guide" style={guideStyle} aria-label="한 마디 서브디비전 카운트">
+            {groups.map((labels, beatIndex) => (
+              <div key={beatIndex} className={beatIndex === beatInBar ? 'count-beat-group active-beat' : 'count-beat-group'}>
+                <b>{beatIndex + 1}박</b>
+                <section>
+                  {labels.map((label, subIndex) => (
+                    <span key={`${beatIndex}-${subIndex}`} className={[
+                      isSubdivisionSoundCell(subdivision, subIndex) ? 'sound-on' : 'guide-only',
+                      subIndex > 0 ? 'offbeat-guide' : 'downbeat-guide',
+                      beatIndex === beatInBar && subIndex === activeVisualIndex ? 'active' : '',
+                    ].filter(Boolean).join(' ')}>{label}</span>
+                  ))}
+                </section>
+              </div>
+            ))}
+          </div>
+
           <div className="lab-primary-actions"><button id="metronome-toggle" type="button" className="primary-button" onClick={running ? stop : start}>{running ? '정지' : '시작'}</button><button type="button" className="secondary-button" onClick={tapTempo}>TAP TEMPO</button></div>
           <div className="quick-bpm-row">{[60, 80, 100, 120, 140, 160, 180].map((value) => <button key={value} type="button" className={bpm === value ? 'active' : ''} onClick={() => setBpm(value)}>{value}</button>)}</div>
           <div className="lab-session-strip"><span>시간 <strong>{formatClock(elapsedSeconds)}</strong></span><span>마디 <strong>{barCount}</strong></span><span>목표 <strong>{timerMinutes ? `${timerMinutes}분` : '없음'}</strong></span></div>
@@ -344,7 +396,10 @@ export default function MetronomePage() {
               <label>서브디비전<select value={subdivision} onChange={(event) => setSubdivision(Number(event.target.value) as MetronomeSubdivision)}><option value={1}>4분음표</option><option value={2}>8분음표</option><option value={3}>셋잇단</option><option value={4}>16분음표</option></select></label>
               <label>스윙<select value={swing} disabled={subdivision === 1 || subdivision === 3} onChange={(event) => setSwing(Number(event.target.value))}>{SWING_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
             </div>
-            <div className="accent-sequencer">{accents.map((active, index) => <button key={index} type="button" className={active ? 'active' : ''} onClick={() => setAccents((current) => current.map((value, item) => item === index ? !value : value))}><strong>{index + 1}</strong><span>{active ? '강세' : '보통'}</span></button>)}</div>
+            <p className="meter-grouping-hint">{beatsPerBar}/4 추천 묶음: <strong>{grouping.join(' + ')}</strong>. 각 묶음의 시작 박을 강세로 켜면 긴 마디가 더 잘 들립니다.</p>
+            <div className="accent-sequencer variable-accent-sequencer" style={guideStyle}>
+              {accents.map((active, index) => <button key={index} type="button" className={active ? 'active' : ''} onClick={() => setAccents((current) => current.map((value, item) => item === index ? !value : value))}><strong>{index + 1}</strong><span>{active ? '강세' : '보통'}</span></button>)}
+            </div>
           </section>
 
           <section className="panel lab-panel">

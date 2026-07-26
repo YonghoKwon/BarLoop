@@ -26,11 +26,14 @@ export const DRUM_INSTRUMENTS: DrumInstrumentDefinition[] = [
 ];
 
 export const DRUM_INSTRUMENT_IDS = DRUM_INSTRUMENTS.map((instrument) => instrument.id);
+export const MIN_PATTERN_BEATS = 2;
+export const MAX_PATTERN_BEATS = 12;
 
 export interface DrumPattern {
   id: string;
   name: string;
   description: string;
+  beatsPerBar: number;
   swing: number;
   steps: Record<DrumInstrument, DrumStepLevel[]>;
 }
@@ -44,10 +47,19 @@ export interface PracticeRoutineStep {
   accentTrainer: boolean;
 }
 
-const emptySteps = (): DrumStepLevel[] => Array.from({ length: 16 }, () => 0 as DrumStepLevel);
+export function normalizeBeatsPerBar(value: unknown): number {
+  return Math.min(MAX_PATTERN_BEATS, Math.max(MIN_PATTERN_BEATS, Math.round(Number(value) || 4)));
+}
 
-function toSteps(values: number[] = []): DrumStepLevel[] {
-  return Array.from({ length: 16 }, (_, index) => {
+export function patternStepCount(beatsPerBar: number): number {
+  return normalizeBeatsPerBar(beatsPerBar) * 4;
+}
+
+const emptySteps = (beatsPerBar = 4): DrumStepLevel[] =>
+  Array.from({ length: patternStepCount(beatsPerBar) }, () => 0 as DrumStepLevel);
+
+function toSteps(values: number[] = [], beatsPerBar = 4): DrumStepLevel[] {
+  return Array.from({ length: patternStepCount(beatsPerBar) }, (_, index) => {
     const value = values[index] ?? 0;
     return value === 2 ? 2 : value === 1 ? 1 : 0;
   });
@@ -59,14 +71,17 @@ function pattern(
   description: string,
   swing: number,
   source: Partial<Record<DrumInstrument, number[]>>,
+  beatsPerBar = 4,
 ): DrumPattern {
+  const safeBeats = normalizeBeatsPerBar(beatsPerBar);
   return {
     id,
     name,
     description,
+    beatsPerBar: safeBeats,
     swing,
     steps: Object.fromEntries(
-      DRUM_INSTRUMENT_IDS.map((instrument) => [instrument, toSteps(source[instrument])]),
+      DRUM_INSTRUMENT_IDS.map((instrument) => [instrument, toSteps(source[instrument], safeBeats)]),
     ) as Record<DrumInstrument, DrumStepLevel[]>,
   };
 }
@@ -77,6 +92,16 @@ export const GROOVE_PATTERNS: DrumPattern[] = [
     hihat: [0, 0, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 1, 0, 1, 0],
     snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2],
     kick: [2, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 0, 0, 1],
+  }),
+  pattern('offbeat-eighths', '8분 엇박 그루브', '숫자 박보다 모든 & 위치를 선명하게 느끼도록 하이햇과 킥을 엇박에 배치합니다.', 0.5, {
+    hihat: [0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0],
+    snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2],
+    kick: [2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0],
+  }),
+  pattern('syncopated-sixteenth', '16분 싱코페이션', 'e·&·a에 킥과 고스트 스네어를 배치해 앞뒤로 당겨지는 엇박을 연습합니다.', 0.5, {
+    hihat: [2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1],
+    snare: [0, 0, 0, 1, 2, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0, 1],
+    kick: [2, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0, 1, 0, 1, 0, 0],
   }),
   pattern('four-floor', '포 온 더 플로어', '매 박의 킥과 2·4박 스네어로 다운비트와 일정한 펄스를 단단히 연습합니다.', 0.5, {
     crash: [2],
@@ -114,6 +139,18 @@ export const GROOVE_PATTERNS: DrumPattern[] = [
     snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     kick: [2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2],
   }),
+  pattern('five-four-rock', '5박 록 · 3+2', '5/4를 3+2로 묶어 첫 박과 4박의 중심, 마지막 &의 엇박 킥을 함께 연습합니다.', 0.5, {
+    crash: [2],
+    hihat: [2, 0, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 1, 0, 1, 0],
+    snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0],
+    kick: [2, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0],
+  }, 5),
+  pattern('seven-four-drive', '7박 드라이브 · 4+3', '7/4를 4+3으로 묶고 후반 3박의 킥·스네어 엇박으로 긴 마디 감각을 익힙니다.', 0.5, {
+    crash: [2],
+    ride: [2, 0, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+    snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0],
+    kick: [2, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 1],
+  }, 7),
 ];
 
 export const DEFAULT_CUSTOM_PATTERN: DrumPattern = clonePattern(
@@ -121,12 +158,12 @@ export const DEFAULT_CUSTOM_PATTERN: DrumPattern = clonePattern(
   'custom',
   '내 커스텀 패턴',
 );
-DEFAULT_CUSTOM_PATTERN.description = '4피스 드럼과 심벌의 각 칸을 무음·일반·강세로 편집할 수 있습니다.';
+DEFAULT_CUSTOM_PATTERN.description = '2~12박 한 마디에서 4피스 드럼과 심벌의 각 16분 칸을 편집할 수 있습니다.';
 
 export const DEFAULT_ROUTINE: PracticeRoutineStep[] = [
   { id: 'warmup', name: '워밍업', bpm: 80, bars: 8, patternId: 'basic-rock', accentTrainer: false },
-  { id: 'control', name: '16분 컨트롤', bpm: 75, bars: 8, patternId: 'sixteenth-funk', accentTrainer: true },
-  { id: 'fill', name: '4피스 필인', bpm: 90, bars: 8, patternId: 'four-piece-fill', accentTrainer: false },
+  { id: 'control', name: '16분 엇박 컨트롤', bpm: 75, bars: 8, patternId: 'syncopated-sixteenth', accentTrainer: true },
+  { id: 'odd-meter', name: '5박 그루브', bpm: 90, bars: 8, patternId: 'five-four-rock', accentTrainer: false },
 ];
 
 export function clonePattern(source: DrumPattern, id = source.id, name = source.name): DrumPattern {
@@ -134,8 +171,28 @@ export function clonePattern(source: DrumPattern, id = source.id, name = source.
     ...source,
     id,
     name,
+    beatsPerBar: normalizeBeatsPerBar(source.beatsPerBar),
     steps: Object.fromEntries(
       DRUM_INSTRUMENT_IDS.map((instrument) => [instrument, [...source.steps[instrument]]]),
+    ) as Record<DrumInstrument, DrumStepLevel[]>,
+  };
+}
+
+export function resizePattern(source: DrumPattern, beatsPerBar: number): DrumPattern {
+  const normalized = normalizePattern(source);
+  const safeBeats = normalizeBeatsPerBar(beatsPerBar);
+  const nextLength = patternStepCount(safeBeats);
+  return {
+    ...normalized,
+    id: 'custom',
+    name: '내 커스텀 패턴',
+    beatsPerBar: safeBeats,
+    description: `${safeBeats}/4 · ${nextLength}칸 커스텀 패턴`,
+    steps: Object.fromEntries(
+      DRUM_INSTRUMENT_IDS.map((instrument) => [
+        instrument,
+        Array.from({ length: nextLength }, (_, index) => normalized.steps[instrument][index] ?? 0),
+      ]),
     ) as Record<DrumInstrument, DrumStepLevel[]>,
   };
 }
@@ -143,11 +200,19 @@ export function clonePattern(source: DrumPattern, id = source.id, name = source.
 export function normalizePattern(value: unknown): DrumPattern {
   if (!value || typeof value !== 'object') return clonePattern(DEFAULT_CUSTOM_PATTERN);
   const candidate = value as Partial<DrumPattern> & { steps?: Partial<Record<DrumInstrument, unknown>> };
+  const longestStoredLength = Math.max(
+    0,
+    ...DRUM_INSTRUMENT_IDS.map((instrument) =>
+      Array.isArray(candidate.steps?.[instrument]) ? (candidate.steps?.[instrument] as unknown[]).length : 0,
+    ),
+  );
+  const derivedBeats = longestStoredLength > 0 ? Math.ceil(longestStoredLength / 4) : 4;
+  const beatsPerBar = normalizeBeatsPerBar(candidate.beatsPerBar ?? derivedBeats);
   const normalizeSteps = (instrument: DrumInstrument): DrumStepLevel[] => {
     const raw = Array.isArray(candidate.steps?.[instrument])
       ? candidate.steps?.[instrument] as unknown[]
-      : emptySteps();
-    return Array.from({ length: 16 }, (_, index) => {
+      : emptySteps(beatsPerBar);
+    return Array.from({ length: patternStepCount(beatsPerBar) }, (_, index) => {
       const item = Number(raw[index] ?? 0);
       return item === 2 ? 2 : item === 1 ? 1 : 0;
     });
@@ -158,6 +223,7 @@ export function normalizePattern(value: unknown): DrumPattern {
     description: typeof candidate.description === 'string'
       ? candidate.description
       : DEFAULT_CUSTOM_PATTERN.description,
+    beatsPerBar,
     swing: Number(candidate.swing) >= 0.5 && Number(candidate.swing) <= 0.75
       ? Number(candidate.swing)
       : 0.5,
@@ -176,12 +242,17 @@ export function grooveById(id: string, customPattern?: DrumPattern): DrumPattern
   return clonePattern(GROOVE_PATTERNS.find((item) => item.id === id) ?? GROOVE_PATTERNS[0]);
 }
 
-export function nextMovingAccentIndex(current: number, mode: 'forward' | 'random'): number {
+export function nextMovingAccentIndex(
+  current: number,
+  mode: 'forward' | 'random',
+  totalSteps = 16,
+): number {
+  const safeTotal = Math.max(1, Math.round(totalSteps));
   if (mode === 'random') {
-    const next = Math.floor(Math.random() * 16);
-    return next === current ? (next + 1) % 16 : next;
+    const next = Math.floor(Math.random() * safeTotal);
+    return next === current ? (next + 1) % safeTotal : next;
   }
-  return (current + 1) % 16;
+  return (current + 1) % safeTotal;
 }
 
 export function routineTotalBars(steps: PracticeRoutineStep[]): number {

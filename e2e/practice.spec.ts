@@ -52,7 +52,7 @@ async function expectFullBarWithoutInternalScroll(guide: Locator) {
   const metrics = await guide.evaluate((element) => ({
     clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth,
-    cellCount: element.querySelectorAll(':scope > div > span').length,
+    cellCount: element.querySelectorAll(':scope > div span').length,
   }));
   expect(metrics.cellCount).toBe(16);
   expect(metrics.scrollWidth - metrics.clientWidth).toBeLessThanOrEqual(1);
@@ -133,8 +133,8 @@ test('drummer training page supports groove, sequencer and routines', async ({ p
   await expect(page.getByLabel('연습 루틴 빌더')).toBeVisible();
   await page.getByRole('button', { name: /16비트 펑크/ }).click();
   await expect(page.getByText('16비트 펑크 패턴을 적용했습니다.')).toBeVisible();
-  await page.getByLabel('킥 1 강세').click();
-  await expect(page.getByLabel('킥 1 무음')).toBeVisible();
+  await page.getByLabel(/킥 1 .*강세/).click();
+  await expect(page.getByLabel(/킥 1 .*무음/)).toBeVisible();
   await expectNoPageOverflow(page);
   await expect(suite).toBeVisible();
 });
