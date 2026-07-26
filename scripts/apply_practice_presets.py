@@ -1,27 +1,10 @@
 from pathlib import Path
+import re
 
 path = Path('src/pages/MetronomeLabPage.tsx')
 text = path.read_text(encoding='utf-8')
 
-
-def replace_once(old: str, new: str) -> None:
-    global text
-    if old not in text:
-        raise RuntimeError(f'Expected source block not found:\n{old[:240]}')
-    text = text.replace(old, new, 1)
-
-
-replace_once(
-"""const RUDIMENTS = [
-  { name: 'Single Stroke', sticking: 'R L R L  R L R L', accent: '>       >' },
-  { name: 'Double Stroke', sticking: 'R R L L  R R L L', accent: '>       >' },
-  { name: 'Paradiddle', sticking: 'R L R R  L R L L', accent: '>       >' },
-  { name: 'Double Paradiddle', sticking: 'R L R L R R  L R L R L L', accent: '>           >' },
-  { name: 'Paradiddle-diddle', sticking: 'R L R R L L  L R L L R R', accent: '>           >' },
-  { name: 'Six Stroke Roll', sticking: 'R L L R R L  L R R L L R', accent: '>         >' },
-] as const;
-""",
-"""const PRACTICE_PRESETS = [
+PRESETS = """const PRACTICE_PRESETS = [
   {
     name: '8분 기본기',
     description: '느린 템포에서 클릭 사이를 안정적으로 채우며 손과 발의 기본 타이밍을 정리합니다.',
@@ -107,17 +90,23 @@ replace_once(
     timerMinutes: 15,
     tags: ['80→120 BPM', '+5 BPM', '8마디마다'],
   },
-] as const;
-""",
-)
+] as const;"""
 
-replace_once('  rudimentIndex: number;\n', '  practicePresetIndex: number;\n')
-replace_once('  rudimentIndex: 2,\n', '  practicePresetIndex: 1,\n')
-replace_once(
-"""      countMode,
-      bpm: clampBpm(Number(stored.bpm) || DEFAULTS.bpm),
-""",
-"""      countMode,
+
+def sub(pattern: str, replacement: str, label: str, flags: int = 0) -> None:
+    global text
+    text, count = re.subn(pattern, lambda _: replacement, text, count=1, flags=flags)
+    if count != 1:
+        raise RuntimeError(f'{label}: expected one match, found {count}')
+    print(f'applied: {label}')
+
+
+sub(r"const RUDIMENTS = \[.*?\] as const;", PRESETS, 'preset definitions', re.S)
+sub(r"  rudimentIndex: number;", "  practicePresetIndex: number;", 'stored setting field')
+sub(r"  rudimentIndex: 2,", "  practicePresetIndex: 1,", 'default preset')
+sub(
+    r"      countMode,\n      bpm: clampBpm",
+    """      countMode,
       practicePresetIndex: Math.min(
         PRACTICE_PRESETS.length - 1,
         Math.max(
@@ -125,23 +114,23 @@ replace_once(
           Math.round(Number(stored.practicePresetIndex ?? (stored as { rudimentIndex?: number }).rudimentIndex ?? DEFAULTS.practicePresetIndex)),
         ),
       ),
-      bpm: clampBpm(Number(stored.bpm) || DEFAULTS.bpm),
-""",
+      bpm: clampBpm""",
+    'stored preset migration',
 )
-replace_once(
-"  const [rudimentIndex, setRudimentIndex] = useState(initial.rudimentIndex);\n",
-"  const [practicePresetIndex, setPracticePresetIndex] = useState(initial.practicePresetIndex);\n",
+sub(
+    r"  const \[rudimentIndex, setRudimentIndex\] = useState\(initial\.rudimentIndex\);",
+    "  const [practicePresetIndex, setPracticePresetIndex] = useState(initial.practicePresetIndex);",
+    'preset state',
 )
-replace_once('          rudimentIndex,\n', '          practicePresetIndex,\n')
-replace_once(
-'  }, [countMode, rudimentIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]);\n',
-'  }, [countMode, practicePresetIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]);\n',
+sub(r"          rudimentIndex,", "          practicePresetIndex,", 'persist preset')
+sub(
+    r"\[countMode, rudimentIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget\]",
+    "[countMode, practicePresetIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]",
+    'storage dependencies',
 )
-replace_once(
-"""  const rudiment = RUDIMENTS[Math.min(RUDIMENTS.length - 1, Math.max(0, rudimentIndex))];
-  const progress = timerMinutes > 0 ? Math.min(100, (elapsedSeconds / (timerMinutes * 60)) * 100) : 0;
-""",
-"""  const practicePreset = PRACTICE_PRESETS[Math.min(PRACTICE_PRESETS.length - 1, Math.max(0, practicePresetIndex))];
+sub(
+    r"  const rudiment = RUDIMENTS\[.*?\];\n  const progress =",
+    """  const practicePreset = PRACTICE_PRESETS[Math.min(PRACTICE_PRESETS.length - 1, Math.max(0, practicePresetIndex))];
 
   const applyPracticePreset = () => {
     if (running) stop();
@@ -164,21 +153,18 @@ replace_once(
     setNotice(`${practicePreset.name} 프리셋을 적용했습니다. 시작 버튼을 눌러 연습하세요.`);
   };
 
-  const progress = timerMinutes > 0 ? Math.min(100, (elapsedSeconds / (timerMinutes * 60)) * 100) : 0;
-""",
+  const progress =""",
+    'preset application',
+    re.S,
 )
-replace_once(
-'          <div className="subdivision-count-guide" aria-label="한 마디 서브디비전 카운트">\n',
-'          <div className={beatsPerBar <= 4 ? \'subdivision-count-guide fit-full-bar\' : \'subdivision-count-guide\'} aria-label="한 마디 서브디비전 카운트">\n',
+sub(
+    r'<div className="subdivision-count-guide" aria-label="한 마디 서브디비전 카운트">',
+    "<div className={beatsPerBar <= 4 ? 'subdivision-count-guide fit-full-bar' : 'subdivision-count-guide'} aria-label=\"한 마디 서브디비전 카운트\">",
+    'standalone full bar class',
 )
-replace_once(
-"""          <section className="panel lab-panel rudiment-panel">
-            <div className="section-title-row"><h2>러디먼트</h2><select value={rudimentIndex} onChange={(event) => setRudimentIndex(Number(event.target.value))}>{RUDIMENTS.map((item, index) => <option key={item.name} value={index}>{item.name}</option>)}</select></div>
-            <div className="sticking-display"><strong>{rudiment.sticking}</strong><span>{rudiment.accent}</span></div>
-            <p className="hint">메트로놈과 함께 손 순서와 악센트를 반복하세요.</p>
-          </section>
-""",
-"""          <section className="panel lab-panel practice-preset-panel">
+sub(
+    r"          <section className=\"panel lab-panel rudiment-panel\">.*?          </section>",
+    """          <section className="panel lab-panel practice-preset-panel">
             <div className="section-title-row">
               <div>
                 <h2>연습 프리셋</h2>
@@ -203,8 +189,12 @@ replace_once(
               이 설정으로 연습 준비
             </button>
             <p className="hint">클릭 음색과 음량은 현재 값을 유지하며, BPM·박자·서브디비전·악센트·Gap Click·템포 트레이너·타이머만 변경합니다.</p>
-          </section>
-""",
+          </section>""",
+    'practice preset panel',
+    re.S,
 )
+
+if 'RUDIMENTS' in text or 'setRudimentIndex' in text:
+    raise RuntimeError('legacy rudiment UI remains after migration')
 
 path.write_text(text, encoding='utf-8')
