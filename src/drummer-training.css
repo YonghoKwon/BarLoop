@@ -1,3 +1,5 @@
+.metronome-lab-page { width: 100%; max-width: 100vw; overflow-x: hidden; overflow-x: clip; }
+.lab-layout { min-width: 0; max-width: 100%; }
 .drummer-training-suite { display: grid; gap: 14px; min-width: 0; max-width: 100%; }
 .lab-controls, .training-feature-block, .drum-sequencer-grid, .routine-builder { min-width: 0; max-width: 100%; }
 .training-suite-title { align-items: flex-start; }
