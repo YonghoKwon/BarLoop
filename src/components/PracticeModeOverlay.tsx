@@ -1,4 +1,4 @@
-import type { Subdivision } from '../lib/metronome';
+import type { MediaCountMode, Subdivision } from '../lib/metronome';
 import { getCurrentSubdivisionCount } from '../lib/subdivisionCount';
 import { formatTime } from '../lib/time';
 import SubdivisionCountGuide from './SubdivisionCountGuide';
@@ -17,6 +17,7 @@ interface PracticeModeOverlayProps {
   subdivision: Subdivision;
   beatsPerBar: number;
   metronomeEnabled: boolean;
+  countMode: MediaCountMode;
   audibleBeat: boolean;
   countInRemaining: number | null;
   wakeLockActive: boolean;
@@ -42,6 +43,7 @@ export default function PracticeModeOverlay({
   subdivision,
   beatsPerBar,
   metronomeEnabled,
+  countMode,
   audibleBeat,
   countInRemaining,
   wakeLockActive,
@@ -55,6 +57,7 @@ export default function PracticeModeOverlay({
   if (!visible) return null;
 
   const currentCount = getCurrentSubdivisionCount(currentBeat, subdivisionInBeat, subdivision);
+  const outputLabel = countMode === 'voice' ? 'VOICE' : countMode === 'both' ? 'BOTH' : 'CLICK';
 
   return (
     <div className="practice-overlay" role="dialog" aria-modal="true" aria-label="드러머 연습 모드">
@@ -77,7 +80,14 @@ export default function PracticeModeOverlay({
         <div>
           <span>COUNT</span>
           <strong className="practice-current-count">{currentCount}</strong>
-          <small>/ {beatsPerBar} {countInRemaining !== null ? `· COUNT IN ${countInRemaining}` : metronomeEnabled ? `· ${audibleBeat ? 'CLICK' : 'GAP'}` : ''}</small>
+          <small>
+            / {beatsPerBar}{' '}
+            {countInRemaining !== null
+              ? `· COUNT IN ${countInRemaining}`
+              : metronomeEnabled
+                ? `· ${audibleBeat ? outputLabel : 'GAP'}`
+                : '· VISUAL GUIDE'}
+          </small>
         </div>
         <div>
           <span>LOOPS</span>
