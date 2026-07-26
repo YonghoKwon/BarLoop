@@ -30,7 +30,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Archive clean source
-        run: tar --exclude=.git --exclude=clean-source.tar.gz --exclude=patched-source.tar.gz -czf clean-source.tar.gz .
+        run: tar -C .. --exclude=BarLoop/.git -czf /tmp/clean-source.tar.gz BarLoop
       - name: Apply patch and capture diagnostics
         run: |
           set +e
@@ -39,14 +39,14 @@ jobs:
           cat patch-diagnostics.log
           exit 0
       - name: Archive patched source
-        run: tar --exclude=.git --exclude=clean-source.tar.gz --exclude=patched-source.tar.gz -czf patched-source.tar.gz .
+        run: tar -C .. --exclude=BarLoop/.git -czf /tmp/patched-source.tar.gz BarLoop
       - name: Upload generated source and diagnostics
         uses: actions/upload-artifact@v4
         with:
           name: video-practice-patch-workspace
           if-no-files-found: error
           path: |
-            clean-source.tar.gz
-            patched-source.tar.gz
+            /tmp/clean-source.tar.gz
+            /tmp/patched-source.tar.gz
             patch-diagnostics.log
             patch-exit-code.txt
