@@ -27,21 +27,7 @@ jobs:
           node-version: 24
       - run: npm install
       - run: npm test
-      - name: Build and capture diagnostics
-        id: production-build
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          npm run build 2>&1 | tee build-diagnostics.log
-      - name: Upload build diagnostics
-        if: steps.production-build.outcome != 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: metronome-build-diagnostics
-          path: build-diagnostics.log
-      - name: Fail when build failed
-        if: steps.production-build.outcome != 'success'
-        run: exit 1
+      - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
