@@ -26,7 +26,19 @@ jobs:
         with:
           node-version: 24
       - run: npm install
-      - run: npm test
+      - name: Run unit tests
+        id: unit-tests
+        continue-on-error: true
+        run: npm test -- --reporter=json --outputFile=vitest-results.json
+      - name: Upload failed unit test report
+        if: steps.unit-tests.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-results
+          path: vitest-results.json
+      - name: Stop after unit test failure
+        if: steps.unit-tests.outcome != 'success'
+        run: exit 1
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
