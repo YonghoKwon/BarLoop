@@ -7,10 +7,11 @@ interface LocalMediaPlayerProps extends PlayerCallbacks {
   kind: 'audio' | 'video';
   playbackRate: number;
   preservePitch: boolean;
+  volume: number;
 }
 
 const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
-  ({ src, name, kind, playbackRate, preservePitch, onReady, onPlayingChange, onError }, ref) => {
+  ({ src, name, kind, playbackRate, preservePitch, volume, onReady, onPlayingChange, onError }, ref) => {
     const mediaRef = useRef<HTMLMediaElement | null>(null);
     const [playing, setPlaying] = useState(false);
 
@@ -27,6 +28,9 @@ const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
         setPlaybackRate: (rate) => {
           if (mediaRef.current) mediaRef.current.playbackRate = rate;
         },
+        setVolume: (nextVolume) => {
+          if (mediaRef.current) mediaRef.current.volume = Math.min(1, Math.max(0, nextVolume));
+        },
       }),
       [],
     );
@@ -36,7 +40,8 @@ const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
       if (!media) return;
       media.playbackRate = playbackRate;
       media.preservesPitch = preservePitch;
-    }, [playbackRate, preservePitch]);
+      media.volume = Math.min(1, Math.max(0, volume));
+    }, [playbackRate, preservePitch, volume]);
 
     const updatePlaying = (next: boolean) => {
       setPlaying(next);
@@ -53,6 +58,7 @@ const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
     const handleLoadedMetadata = (media: HTMLMediaElement) => {
       media.playbackRate = playbackRate;
       media.preservesPitch = preservePitch;
+      media.volume = Math.min(1, Math.max(0, volume));
       onReady(media.duration);
     };
 
