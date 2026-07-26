@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BpmNumberInput from '../components/BpmNumberInput';
+import { preparePlaybackAudioSession, releasePlaybackAudioSession } from '../lib/audioPlaybackSession';
 import { clampBpm } from '../lib/bpm';
+import {
+  isKoreanCountVoiceSupported,
+  primeKoreanCountVoice,
+  speakKoreanCount,
+  stopKoreanCountVoice,
+  type CountVoiceMode,
+} from '../lib/koreanCountVoice';
 import {
   StandaloneMetronomeEngine,
   type MetronomeSound,
@@ -28,6 +36,7 @@ interface StoredLabSettings {
   subdivisionVolume: number;
   swing: number;
   sound: MetronomeSound;
+  countMode: CountVoiceMode;
   accents: boolean[];
   gapEnabled: boolean;
   gapPlayBars: number;
@@ -49,6 +58,7 @@ const DEFAULTS: StoredLabSettings = {
   subdivisionVolume: 0.34,
   swing: 0.5,
   sound: 'classic',
+  countMode: 'click',
   accents: [true, false, false, false],
   gapEnabled: false,
   gapPlayBars: 4,
@@ -65,9 +75,13 @@ function readSettings(): StoredLabSettings {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') as Partial<StoredLabSettings>;
     const beatsPerBar = Math.min(12, Math.max(2, Math.round(Number(stored.beatsPerBar) || 4)));
+    const countMode = ['click', 'voice', 'both'].includes(String(stored.countMode))
+      ? (stored.countMode as CountVoiceMode)
+      : DEFAULTS.countMode;
     return {
       ...DEFAULTS,
       ...stored,
+      countMode,
       bpm: clampBpm(Number(stored.bpm) || DEFAULTS.bpm),
       beatsPerBar,
       subdivision: [1, 2, 3, 4].includes(Number(stored.subdivision))
@@ -100,6 +114,7 @@ export default function MetronomeLabPage() {
   const [subdivisionVolume, setSubdivisionVolume] = useState(initial.subdivisionVolume);
   const [swing, setSwing] = useState(initial.swing);
   const [sound, setSound] = useState<MetronomeSound>(initial.sound);
+  const [countMode, setCountMode] = useState<CountVoiceMode>(initial.countMode);
   const [accents, setAccents] = useState(initial.accents);
   const [gapEnabled, setGapEnabled] = useState(initial.gapEnabled);
   const [gapPlayBars, setGapPlayBars] = useState(initial.gapPlayBars);
@@ -117,6 +132,10 @@ export default function MetronomeLabPage() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [audible, setAudible] = useState(true);
   const [notice, setNotice] = useState('');
+
+  const voiceSupported = isKoreanCountVoiceSupported();
+  const voiceConfigRef = useRef({ countMode, bpm, volume, accentVolume, accents });
+  voiceConfigRef.current = { countMode, bpm, volume, accentVolume, accents };
 
   const settings = useMemo<StandaloneMetronomeSettings>(
     () => ({
@@ -149,11 +168,29 @@ export default function MetronomeLabPage() {
     ],
   );
 
+  const engineSettings = useMemo<StandaloneMetronomeSettings>(() => {
+    if (countMode !== 'voice' || !voiceSupported) return settings;
+    return {
+      ...settings,
+      volume: 0,
+      accentVolume: 0,
+      subdivisionVolume: 0,
+    };
+  }, [countMode, settings, voiceSupported]);
+
+  const stop = useCallback(() => {
+    engineRef.current.stop();
+    stopKoreanCountVoice();
+    releasePlaybackAudioSession();
+    setRunning(false);
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         ...settings,
+        countMode,
         trainerEnabled,
         trainerTarget,
         trainerStep,
@@ -162,11 +199,11 @@ export default function MetronomeLabPage() {
         rudimentIndex,
       }),
     );
-  }, [rudimentIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]);
+  }, [countMode, rudimentIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]);
 
   useEffect(() => {
-    engineRef.current.update(settings);
-  }, [settings]);
+    engineRef.current.update(engineSettings);
+  }, [engineSettings]);
 
   useEffect(() => {
     setAccents((current) =>
@@ -181,15 +218,14 @@ export default function MetronomeLabPage() {
       setElapsedSeconds((seconds) => {
         const next = seconds + 1;
         if (timerMinutes > 0 && next >= timerMinutes * 60) {
-          engineRef.current.stop();
-          setRunning(false);
+          stop();
           setNotice(`${timerMinutes}분 연습 목표를 완료했습니다.`);
         }
         return next;
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [running, timerMinutes]);
+  }, [running, stop, timerMinutes]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -205,23 +241,44 @@ export default function MetronomeLabPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  useEffect(() => () => engineRef.current.stop(), []);
-
-  const stop = useCallback(() => {
-    engineRef.current.stop();
-    setRunning(false);
-  }, []);
+  useEffect(
+    () => () => {
+      engineRef.current.stop();
+      stopKoreanCountVoice();
+      releasePlaybackAudioSession();
+    },
+    [],
+  );
 
   const start = useCallback(async () => {
     setNotice('');
     barCountRef.current = 0;
     setBarCount(0);
     setElapsedSeconds(0);
+    primeKoreanCountVoice();
+
+    if (countMode !== 'click' && !voiceSupported) {
+      setNotice('이 브라우저는 한국어 음성 합성을 지원하지 않아 클릭음으로 재생합니다.');
+    }
+
     try {
-      await engineRef.current.start(settings, (tick) => {
+      const playbackSession = preparePlaybackAudioSession();
+      const metronome = engineRef.current.start(engineSettings, (tick) => {
         setBeatInBar(tick.beatInBar);
         setSubdivisionInBeat(tick.subdivisionInBeat);
         setAudible(tick.audible);
+
+        const voice = voiceConfigRef.current;
+        if (
+          tick.audible &&
+          tick.subdivisionInBeat === 0 &&
+          voice.countMode !== 'click' &&
+          isKoreanCountVoiceSupported()
+        ) {
+          const voiceVolume = voice.accents[tick.beatInBar] ? voice.accentVolume : voice.volume;
+          speakKoreanCount(tick.beatInBar, voice.bpm, voiceVolume);
+        }
+
         if (tick.beatInBar === 0 && tick.subdivisionInBeat === 0) {
           const nextBars = barCountRef.current + 1;
           barCountRef.current = nextBars;
@@ -231,11 +288,23 @@ export default function MetronomeLabPage() {
           }
         }
       });
+
+      await Promise.all([playbackSession, metronome]);
       setRunning(true);
     } catch (error) {
+      releasePlaybackAudioSession();
       setNotice(error instanceof Error ? error.message : '메트로놈을 시작할 수 없습니다.');
     }
-  }, [settings, trainerBars, trainerEnabled, trainerStep, trainerTarget]);
+  }, [countMode, engineSettings, trainerBars, trainerEnabled, trainerStep, trainerTarget, voiceSupported]);
+
+  const testVoice = useCallback(async () => {
+    setNotice('');
+    const playbackSession = preparePlaybackAudioSession();
+    primeKoreanCountVoice();
+    const spoken = speakKoreanCount(0, bpm, accentVolume);
+    await playbackSession;
+    setNotice(spoken ? '한국어 카운트 음성을 재생했습니다.' : '이 브라우저는 한국어 음성 합성을 지원하지 않습니다.');
+  }, [accentVolume, bpm]);
 
   const tapTempo = () => {
     const now = performance.now();
@@ -269,7 +338,7 @@ export default function MetronomeLabPage() {
         <section className="lab-stage panel">
           <div className={audible ? 'beat-orbit' : 'beat-orbit muted'}>
             <div className="beat-number">{beatInBar + 1}</div>
-            <span>{audible ? 'CLICK' : 'GAP'}</span>
+            <span>{audible ? (countMode === 'voice' ? 'VOICE' : countMode === 'both' ? 'BOTH' : 'CLICK') : 'GAP'}</span>
           </div>
 
           <div className="lab-bpm-row">
@@ -346,23 +415,36 @@ export default function MetronomeLabPage() {
           </section>
 
           <section className="panel lab-panel">
-            <div className="section-title-row"><h2>오디오 믹서</h2><span>{sound}</span></div>
+            <div className="section-title-row"><h2>오디오 믹서</h2><span>{countMode === 'click' ? sound : countMode === 'voice' ? '한국어 음성' : `${sound} + 음성`}</span></div>
             <div className="compact-grid two">
+              <label>메인 박 출력
+                <select value={countMode} onChange={(event) => setCountMode(event.target.value as CountVoiceMode)}>
+                  <option value="click">클릭음</option>
+                  <option value="voice">한국어 카운트</option>
+                  <option value="both">클릭 + 한국어 카운트</option>
+                </select>
+              </label>
               <label>클릭 음색
-                <select value={sound} onChange={(event) => setSound(event.target.value as MetronomeSound)}>
+                <select value={sound} disabled={countMode === 'voice'} onChange={(event) => setSound(event.target.value as MetronomeSound)}>
                   <option value="classic">Classic</option><option value="wood">Wood</option><option value="rim">Rim</option><option value="cowbell">Cowbell</option>
                 </select>
               </label>
               <label>기본 클릭 {Math.round(volume * 100)}%
-                <input type="range" min={0} max={1} step={0.01} value={volume} onChange={(event) => setVolume(Number(event.target.value))} />
+                <input type="range" min={0} max={1} step={0.01} value={volume} disabled={countMode === 'voice'} onChange={(event) => setVolume(Number(event.target.value))} />
               </label>
-              <label>강세 {Math.round(accentVolume * 100)}%
+              <label>강세·음성 {Math.round(accentVolume * 100)}%
                 <input type="range" min={0} max={1} step={0.01} value={accentVolume} onChange={(event) => setAccentVolume(Number(event.target.value))} />
               </label>
               <label>서브디비전 {Math.round(subdivisionVolume * 100)}%
-                <input type="range" min={0} max={1} step={0.01} value={subdivisionVolume} onChange={(event) => setSubdivisionVolume(Number(event.target.value))} />
+                <input type="range" min={0} max={1} step={0.01} value={subdivisionVolume} disabled={countMode === 'voice'} onChange={(event) => setSubdivisionVolume(Number(event.target.value))} />
               </label>
             </div>
+            <button type="button" className="secondary-button full-width" onClick={() => void testVoice()}>
+              한국어 음성 테스트 · 하나
+            </button>
+            <p className="hint">
+              한국어 카운트는 메인 박마다 하나·둘·셋·넷으로 읽습니다. 빠른 BPM에서는 시스템 음성 특성상 클릭보다 조금 늦을 수 있습니다.
+            </p>
           </section>
 
           <section className="panel lab-panel">
@@ -397,7 +479,7 @@ export default function MetronomeLabPage() {
         </div>
       </main>
 
-      <footer className="lab-footer">Space 시작/정지 · +/− BPM 조절 · 설정은 이 브라우저에 자동 저장됩니다.</footer>
+      <footer className="lab-footer">iPhone 무음 모드 대응 재생 세션 · Space 시작/정지 · +/− BPM 조절 · 설정 자동 저장</footer>
     </div>
   );
 }
