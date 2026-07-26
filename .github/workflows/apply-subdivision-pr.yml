@@ -28,7 +28,7 @@ jobs:
           text = path.read_text()
           text = text.replace(
               "return subdivisionIndex === 0 ? token : `${beatIndex + 1} ${token}`;",
-              "return subdivisionIndex === 0 ? token : `\\${beatIndex + 1} \\${token}`;",
+              "return subdivisionIndex === 0 ? token : \\`\\${beatIndex + 1} \\${token}\\`;",
           )
           text = text.replace(
               "key={\\`${countBeatIndex}-\\${countSubdivisionIndex}\\`}",
