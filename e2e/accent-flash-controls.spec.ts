@@ -34,7 +34,7 @@ test('drummer training explains eighth offbeats separately from sixteenth positi
   await expect(explainer).toContainText('8분 엇박');
   await expect(explainer).toContainText('16분 사이');
   await page.getByRole('button', { name: '모든 &에 8분 엇박' }).click();
-  await expect(page.getByLabel(/하이햇 1 & 8분 엇박 강세/)).toBeVisible();
+  await expect(page.getByLabel(/하이햇 & 8분 엇박 강세/)).toBeVisible();
   await expect(page.locator('.drum-substep-grid button.eighth-offbeat-cell').first()).toBeVisible();
   await expect(page.locator('.drum-substep-grid button.sixteenth-between-cell').first()).toBeVisible();
   await expectNoPageOverflow(page);

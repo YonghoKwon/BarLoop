@@ -180,3 +180,31 @@
   0% { opacity: var(--flash-power); }
   100% { opacity: 0; }
 }
+
+
+/* Prevent intrinsic form widths from pushing the customization card outside iPad layouts. */
+.accent-flash-panel,
+.training-accent-settings,
+.accent-flash-controls,
+.accent-option-grid,
+.accent-option-group,
+.accent-tone-options,
+.accent-range-option,
+.accent-duration-option,
+.accent-detail-options {
+  min-width: 0;
+}
+.accent-flash-panel,
+.training-accent-settings { overflow: hidden; }
+.accent-option-grid > *,
+.accent-style-tabs > *,
+.accent-tone-options > * { min-width: 0; }
+.accent-duration-option select { width: 100%; min-width: 0; max-width: 100%; }
+.accent-style-tabs button,
+.accent-tone-options button { overflow-wrap: anywhere; }
+
+@media (max-width: 1250px) {
+  .accent-option-grid { grid-template-columns: 1fr; }
+  .accent-style-tabs,
+  .accent-tone-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

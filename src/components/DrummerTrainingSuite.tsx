@@ -40,8 +40,7 @@ const SUBDIVISION_LABELS = ['정박', 'e', '&', 'a'];
 
 function countLabel(index: number): string {
   const beat = Math.floor(index / 4) + 1;
-  const subdivision = [String(beat), 'e', '&', 'a'][index % 4];
-  return index % 4 === 0 ? subdivision : `${beat} ${subdivision}`;
+  return [String(beat), 'e', '&', 'a'][index % 4];
 }
 
 function meterGroupingLabel(beatsPerBar: number): string {

@@ -418,6 +418,7 @@ export default function MetronomePage() {
           <section className="panel lab-panel accent-flash-panel">
             <AccentFlashControls
               enabled={accentFlashEnabled}
+              toggleLabel="강세 플래시"
               settings={accentFlash}
               onEnabledChange={setAccentFlashEnabled}
               onSettingsChange={setAccentFlash}

@@ -408,6 +408,7 @@ export default function DrummerTrainingPage() {
         <section className="panel training-accent-settings">
           <AccentFlashControls
             enabled={accentFlashEnabled}
+            toggleLabel="강세 화면 플래시"
             settings={accentFlash}
             onEnabledChange={setAccentFlashEnabled}
             onSettingsChange={setAccentFlash}

@@ -1,39 +1,28 @@
 import { expect, test } from '@playwright/test';
 
-test('accent flash provides a full-screen burst and clear label', async ({ page }) => {
+test('accent flash defaults to a modern ring and can switch to impact', async ({ page }) => {
   await page.goto('/#metronome');
   await expect(page.getByRole('checkbox', { name: '강세 플래시' })).toBeChecked();
 
-  const flash = page.locator('.accent-flash-wave');
-  await page.evaluate(() => {
-    const orbit = document.querySelector('.beat-orbit');
-    if (!orbit) throw new Error('Beat orbit was not rendered.');
-    const element = document.createElement('i');
-    element.className = 'accent-flash-wave metronome-flash';
-    element.setAttribute('aria-hidden', 'true');
-    orbit.appendChild(element);
-  });
+  const controls = page.getByLabel('강세 플래시 설정');
+  await expect(controls.getByRole('tab', { name: '모던 링' })).toHaveAttribute('aria-selected', 'true');
+  await expect(controls.getByRole('checkbox', { name: '화면 전체 빛' })).not.toBeChecked();
+  await expect(controls.getByRole('checkbox', { name: 'ACCENT 배지' })).not.toBeChecked();
 
-  await expect(flash).toHaveCount(1);
-  const styles = await flash.evaluate((element) => ({
-    ringAnimation: getComputedStyle(element).animationName,
-    ringBorder: getComputedStyle(element).borderTopWidth,
-    screenPosition: getComputedStyle(element, '::before').position,
-    screenAnimation: getComputedStyle(element, '::before').animationName,
-    badgeContent: getComputedStyle(element, '::after').content,
-    badgeAnimation: getComputedStyle(element, '::after').animationName,
-  }));
+  await controls.getByRole('tab', { name: '임팩트' }).click();
+  await expect(controls.getByRole('checkbox', { name: '화면 전체 빛' })).toBeChecked();
+  await expect(controls.getByRole('checkbox', { name: 'ACCENT 배지' })).toBeChecked();
+  await controls.getByRole('button', { name: '미리보기' }).click();
 
-  expect(styles.ringAnimation).toContain('accent-ring');
-  expect(Number.parseFloat(styles.ringBorder)).toBeGreaterThanOrEqual(4);
-  expect(styles.screenPosition).toBe('fixed');
-  expect(styles.screenAnimation).toContain('accent-screen');
-  expect(styles.badgeContent).toContain('강세');
-  expect(styles.badgeAnimation).toContain('accent-badge');
+  const flash = page.getByTestId('accent-flash-effect');
+  await expect(flash).toHaveClass(/accent-style-impact/);
+  await expect(flash).toHaveClass(/accent-screen-on/);
+  await expect(flash).toHaveClass(/accent-badge-on/);
 });
 
-test('drum training keeps the enhanced flash control enabled by default', async ({ page }) => {
+test('drum training keeps the customizable flash enabled by default', async ({ page }) => {
   await page.goto('/#drummer-training');
   await expect(page.getByRole('checkbox', { name: '강세 화면 플래시' })).toBeChecked();
+  await expect(page.getByLabel('강세 플래시 설정')).toBeVisible();
   await expect(page.locator('.training-orbit')).toBeVisible();
 });

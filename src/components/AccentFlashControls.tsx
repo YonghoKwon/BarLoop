@@ -8,6 +8,7 @@ import {
 
 interface AccentFlashControlsProps {
   enabled: boolean;
+  toggleLabel: string;
   settings: AccentFlashSettings;
   onEnabledChange: (enabled: boolean) => void;
   onSettingsChange: (settings: AccentFlashSettings) => void;
@@ -30,6 +31,7 @@ const TONE_OPTIONS: Array<{ value: AccentFlashTone; label: string }> = [
 
 export default function AccentFlashControls({
   enabled,
+  toggleLabel,
   settings,
   onEnabledChange,
   onSettingsChange,
@@ -50,7 +52,7 @@ export default function AccentFlashControls({
           <p>취향과 주변 밝기에 맞게 효과·색상·강도·길이를 조절합니다.</p>
         </div>
         <label className="switch-label accent-master-switch">
-          <input type="checkbox" checked={enabled} onChange={(event) => onEnabledChange(event.target.checked)} />
+          <input aria-label={toggleLabel} type="checkbox" checked={enabled} onChange={(event) => onEnabledChange(event.target.checked)} />
           <span>{enabled ? '사용 중' : '꺼짐'}</span>
         </label>
       </div>
