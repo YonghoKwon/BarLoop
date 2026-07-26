@@ -7,11 +7,11 @@ interface LocalMediaPlayerProps extends PlayerCallbacks {
   kind: 'audio' | 'video';
   playbackRate: number;
   preservePitch: boolean;
-  volume: number;
+  volume?: number;
 }
 
 const LocalMediaPlayer = forwardRef<PlayerHandle, LocalMediaPlayerProps>(
-  ({ src, name, kind, playbackRate, preservePitch, volume, onReady, onPlayingChange, onError }, ref) => {
+  ({ src, name, kind, playbackRate, preservePitch, volume = 0.85, onReady, onPlayingChange, onError }, ref) => {
     const mediaRef = useRef<HTMLMediaElement | null>(null);
     const [playing, setPlaying] = useState(false);
 
