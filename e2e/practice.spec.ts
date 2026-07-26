@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 function createWavBuffer(durationSeconds = 4, sampleRate = 8000): Buffer {
   const samples = Math.round(durationSeconds * sampleRate);
@@ -20,7 +20,7 @@ function createWavBuffer(durationSeconds = 4, sampleRate = 8000): Buffer {
   return buffer;
 }
 
-async function loadLocalAudio(page: Parameters<typeof test>[0]['page']) {
+async function loadLocalAudio(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '내 영상·음원' }).click();
   await page.locator('input[type="file"]').setInputFiles({
