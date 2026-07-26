@@ -30,6 +30,10 @@ jobs:
               "return subdivisionIndex === 0 ? token : `${beatIndex + 1} ${token}`;",
               "return subdivisionIndex === 0 ? token : `\\${beatIndex + 1} \\${token}`;",
           )
+          text = text.replace(
+              "key={\\`${countBeatIndex}-\\${countSubdivisionIndex}\\`}",
+              "key={\\`\\${countBeatIndex}-\\${countSubdivisionIndex}\\`}",
+          )
           path.write_text(text)
           PY
       - run: node scripts/apply_subdivision_counts.mjs
