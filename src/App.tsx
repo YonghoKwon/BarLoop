@@ -702,7 +702,7 @@ function App() {
   };
 
   const setDownbeatValue = (value: number) => {
-    const safe = clamp(Number.isFinite(value) ? value : 0, 0, duration || 0);
+    const safe = clamp(Number.isFinite(value) ? value : 0, 0, duration > 0 ? duration : Number.MAX_SAFE_INTEGER);
     setFirstDownbeat(safe);
     setFirstDownbeatInput(safe.toFixed(2));
   };
