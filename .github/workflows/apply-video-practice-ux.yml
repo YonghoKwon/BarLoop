@@ -29,16 +29,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Apply patch
-        run: python scripts/apply_video_practice_ux.py
-      - name: Commit generated changes
+      - name: Apply patch and capture diagnostics
+        run: |
+          set +e
+          python scripts/apply_video_practice_ux.py > patch-diagnostics.log 2>&1
+          echo $? > patch-exit-code.txt
+          cat patch-diagnostics.log
+          exit 0
+      - name: Commit generated changes or diagnostics
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src e2e public/sw.js
+          git add src e2e public/sw.js patch-diagnostics.log patch-exit-code.txt
           if git diff --cached --quiet; then
             echo "No generated changes"
           else
-            git commit -m "Improve video practice and training controls"
+            git commit -m "Apply video practice UX patch"
             git push origin HEAD:${{ github.head_ref || github.ref_name }}
           fi
