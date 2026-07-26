@@ -1,4 +1,7 @@
+import type { Subdivision } from '../lib/metronome';
+import { getCurrentSubdivisionCount } from '../lib/subdivisionCount';
 import { formatTime } from '../lib/time';
+import SubdivisionCountGuide from './SubdivisionCountGuide';
 
 interface PracticeModeOverlayProps {
   visible: boolean;
@@ -10,8 +13,12 @@ interface PracticeModeOverlayProps {
   loopEnd: number;
   loopCount: number;
   currentBeat: number;
+  subdivisionInBeat: number;
+  subdivision: Subdivision;
   beatsPerBar: number;
   metronomeEnabled: boolean;
+  audibleBeat: boolean;
+  countInRemaining: number | null;
   wakeLockActive: boolean;
   onClose: () => void;
   onTogglePlayback: () => void;
@@ -31,8 +38,12 @@ export default function PracticeModeOverlay({
   loopEnd,
   loopCount,
   currentBeat,
+  subdivisionInBeat,
+  subdivision,
   beatsPerBar,
   metronomeEnabled,
+  audibleBeat,
+  countInRemaining,
   wakeLockActive,
   onClose,
   onTogglePlayback,
@@ -42,6 +53,8 @@ export default function PracticeModeOverlay({
   onToggleWakeLock,
 }: PracticeModeOverlayProps) {
   if (!visible) return null;
+
+  const currentCount = getCurrentSubdivisionCount(currentBeat, subdivisionInBeat, subdivision);
 
   return (
     <div className="practice-overlay" role="dialog" aria-modal="true" aria-label="드러머 연습 모드">
@@ -62,9 +75,9 @@ export default function PracticeModeOverlay({
           <small>원곡 {bpm} · {Math.round(playbackRate * 100)}%</small>
         </div>
         <div>
-          <span>BEAT</span>
-          <strong>{currentBeat + 1}</strong>
-          <small>/ {beatsPerBar} {metronomeEnabled ? '· CLICK' : ''}</small>
+          <span>COUNT</span>
+          <strong className="practice-current-count">{currentCount}</strong>
+          <small>/ {beatsPerBar} {countInRemaining !== null ? `· COUNT IN ${countInRemaining}` : metronomeEnabled ? `· ${audibleBeat ? 'CLICK' : 'GAP'}` : ''}</small>
         </div>
         <div>
           <span>LOOPS</span>
@@ -72,6 +85,15 @@ export default function PracticeModeOverlay({
           <small>{formatTime(loopStart, true)}–{formatTime(loopEnd, true)}</small>
         </div>
       </div>
+
+      <SubdivisionCountGuide
+        beatsPerBar={beatsPerBar}
+        subdivision={subdivision}
+        beatInBar={currentBeat}
+        subdivisionInBeat={subdivisionInBeat}
+        audible={audibleBeat}
+        className="practice-subdivision-guide"
+      />
 
       <div className="practice-progress" aria-label="현재 반복 구간 진행률">
         <i

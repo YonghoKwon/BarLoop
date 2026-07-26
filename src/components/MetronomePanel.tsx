@@ -1,4 +1,6 @@
 import type { Subdivision } from '../lib/metronome';
+import { getCurrentSubdivisionCount } from '../lib/subdivisionCount';
+import SubdivisionCountGuide from './SubdivisionCountGuide';
 
 interface MetronomePanelProps {
   enabled: boolean;
@@ -16,6 +18,7 @@ interface MetronomePanelProps {
   onGapPlayBarsChange: (bars: number) => void;
   onGapMuteBarsChange: (bars: number) => void;
   beatInBar: number;
+  subdivisionInBeat: number;
   beatsPerBar: number;
   audibleBeat: boolean;
   countInRemaining: number | null;
@@ -37,10 +40,13 @@ export default function MetronomePanel({
   onGapPlayBarsChange,
   onGapMuteBarsChange,
   beatInBar,
+  subdivisionInBeat,
   beatsPerBar,
   audibleBeat,
   countInRemaining,
 }: MetronomePanelProps) {
+  const currentCount = getCurrentSubdivisionCount(beatInBar, subdivisionInBeat, subdivision);
+
   return (
     <section className="panel tool-panel metronome-panel">
       <div className="section-title-row">
@@ -58,20 +64,23 @@ export default function MetronomePanel({
         </label>
       </div>
 
-      <div className="beat-lamps" aria-label="현재 박자">
-        {Array.from({ length: beatsPerBar }, (_, index) => (
-          <i
-            key={index}
-            className={index === beatInBar ? (audibleBeat ? 'active' : 'active muted') : ''}
-          >
-            {index + 1}
-          </i>
-        ))}
+      <div className="metronome-count-readout">
+        <strong>{currentCount}</strong>
+        <span>{countInRemaining !== null ? 'COUNT IN' : audibleBeat ? 'CLICK' : 'GAP'}</span>
       </div>
+
+      <SubdivisionCountGuide
+        beatsPerBar={beatsPerBar}
+        subdivision={subdivision}
+        beatInBar={beatInBar}
+        subdivisionInBeat={subdivisionInBeat}
+        audible={audibleBeat}
+        compact
+      />
 
       {countInRemaining !== null && (
         <div className="count-in-banner" role="status">
-          카운트인 <strong>{countInRemaining}</strong>
+          카운트인 <strong>{countInRemaining}</strong>박 남음 · 현재 <strong>{currentCount}</strong>
         </div>
       )}
 
@@ -142,7 +151,7 @@ export default function MetronomePanel({
           마디
         </label>
       </div>
-      <p className="hint">Gap Click은 클릭이 사라진 구간에서도 템포를 유지하는 연습 모드입니다.</p>
+      <p className="hint">4분음표에서도 1 e & a 격자를 유지하며, 실제 소리가 나는 칸은 점으로 구분합니다.</p>
     </section>
   );
 }
