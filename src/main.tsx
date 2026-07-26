@@ -6,6 +6,7 @@ import './advanced.css';
 import './metronome-lab.css';
 import './media-practice.css';
 import './ios-responsive.css';
+import './ios-overflow-fix.css';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
