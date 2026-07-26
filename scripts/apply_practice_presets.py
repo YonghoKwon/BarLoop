@@ -122,7 +122,7 @@ sub(
     "  const [practicePresetIndex, setPracticePresetIndex] = useState(initial.practicePresetIndex);",
     'preset state',
 )
-sub(r"          rudimentIndex,", "          practicePresetIndex,", 'persist preset')
+sub(r"\n\s+rudimentIndex,", "\n        practicePresetIndex,", 'persist preset')
 sub(
     r"\[countMode, rudimentIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget\]",
     "[countMode, practicePresetIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]",
