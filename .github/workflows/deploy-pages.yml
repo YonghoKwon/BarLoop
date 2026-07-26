@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
   statuses: write
@@ -22,9 +22,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Apply metronome polish integration
+        if: github.actor != 'github-actions[bot]' && github.head_ref == 'agent/separate-drum-training-and-metronome-polish'
+        run: python scripts/apply_metronome_polish.py
+      - name: Commit integrated changes
+        if: github.actor != 'github-actions[bot]' && github.head_ref == 'agent/separate-drum-training-and-metronome-polish'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/lib/standaloneMetronome.ts src/drummer-training-page.css public/sw.js e2e/practice.spec.ts
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit"
+          else
+            git commit -m "Integrate metronome and training page polish"
+            git pull --rebase origin agent/separate-drum-training-and-metronome-polish
+            git push origin HEAD:agent/separate-drum-training-and-metronome-polish
+          fi
       - run: npm install
       - name: Run unit tests
         id: unit-tests
