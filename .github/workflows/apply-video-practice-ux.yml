@@ -6,17 +6,16 @@ on:
       - agent/video-practice-ux-training-controls
     paths:
       - scripts/apply_video_practice_ux.py
-      - .github/workflows/apply-video-practice-ux.yml
-  pull_request:
-    branches:
-      - main
-    paths:
-      - scripts/apply_video_practice_ux.py
+      - scripts/run_video_practice_patch.py
       - .github/workflows/apply-video-practice-ux.yml
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: video-practice-ux-patch
+  cancel-in-progress: true
 
 jobs:
   apply:
@@ -24,29 +23,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: agent/video-practice-ux-training-controls
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Archive clean source
-        run: tar -C .. --exclude=BarLoop/.git -czf /tmp/clean-source.tar.gz BarLoop
-      - name: Apply patch and capture diagnostics
-        run: |
-          set +e
-          python scripts/apply_video_practice_ux.py > patch-diagnostics.log 2>&1
-          echo $? > patch-exit-code.txt
-          cat patch-diagnostics.log
-          exit 0
-      - name: Archive patched source
-        run: tar -C .. --exclude=BarLoop/.git -czf /tmp/patched-source.tar.gz BarLoop
-      - name: Upload generated source and diagnostics
-        uses: actions/upload-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: video-practice-patch-workspace
-          if-no-files-found: error
-          path: |
-            /tmp/clean-source.tar.gz
-            /tmp/patched-source.tar.gz
-            patch-diagnostics.log
-            patch-exit-code.txt
+          node-version: 22
+          cache: npm
+      - name: Generate final source
+        run: python scripts/run_video_practice_patch.py
+      - name: Install dependencies
+        run: npm install
+      - name: Run unit tests
+        run: npm test
+      - name: Build production bundle
+        run: npm run build
+      - name: Install browser engines
+        run: npx playwright install --with-deps chromium webkit
+      - name: Run browser tests
+        run: npm run test:e2e
+      - name: Commit validated source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src e2e public/sw.js
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+          else
+            git commit -m "Improve video practice and training controls"
+            git push origin HEAD:agent/video-practice-ux-training-controls
+          fi
