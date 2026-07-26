@@ -1,0 +1,32 @@
+name: Materialize media practice integration
+
+on:
+  push:
+    branches: [agent/metronome-lab-and-quality]
+    paths:
+      - 'scripts/patch_media_practice.py'
+      - '.github/workflows/materialize-media-practice.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/metronome-lab-and-quality
+          fetch-depth: 0
+      - name: Apply App integration patch
+        run: python scripts/patch_media_practice.py
+      - name: Commit integrated source
+        run: |
+          rm -f scripts/patch_media_practice.py
+          rmdir scripts 2>/dev/null || true
+          rm -f .github/workflows/materialize-media-practice.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Integrate media mixer preroll and fill trainer"
+          git push origin HEAD:agent/metronome-lab-and-quality
