@@ -36,20 +36,33 @@ jobs:
           fi
           python - <<'PY'
           from pathlib import Path
-          path = Path('src/App.tsx')
-          text = path.read_text(encoding='utf-8')
-          text = text.replace(
+
+          app_path = Path('src/App.tsx')
+          app = app_path.read_text(encoding='utf-8')
+          app = app.replace(
               "const safe = clamp(Number.isFinite(value) ? value : 0, 0, duration || 0);",
               "const safe = clamp(Number.isFinite(value) ? value : 0, 0, duration > 0 ? duration : Number.MAX_SAFE_INTEGER);",
           )
-          path.write_text(text, encoding='utf-8')
+          app_path.write_text(app, encoding='utf-8')
+
+          metro_path = Path('src/pages/MetronomePage.tsx')
+          metro = metro_path.read_text(encoding='utf-8')
+          metro = metro.replace(
+              "<div className={beatsPerBar <= 4 ? 'subdivision-count-guide fit-full-bar' : 'subdivision-count-guide'}>",
+              "<div className={beatsPerBar <= 4 ? 'subdivision-count-guide fit-full-bar' : 'subdivision-count-guide'} aria-label=\"한 마디 서브디비전 카운트\">",
+          )
+          metro = metro.replace(
+              "<select value={presetIndex} onChange={(event) => setPresetIndex(Number(event.target.value))}>",
+              "<select aria-label=\"연습 프리셋 선택\" value={presetIndex} onChange={(event) => setPresetIndex(Number(event.target.value))}>",
+          )
+          metro_path.write_text(metro, encoding='utf-8')
           PY
       - name: Commit integrated changes
         if: github.actor != 'github-actions[bot]' && github.head_ref == 'agent/separate-drum-training-and-metronome-polish'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/App.tsx src/lib/standaloneMetronome.ts src/drummer-training-page.css public/sw.js e2e/practice.spec.ts
+          git add src/App.tsx src/lib/standaloneMetronome.ts src/pages/MetronomePage.tsx src/drummer-training-page.css public/sw.js e2e/practice.spec.ts
           if git diff --cached --quiet; then
             echo "No generated changes to commit"
           else
