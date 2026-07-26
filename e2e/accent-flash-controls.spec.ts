@@ -11,7 +11,12 @@ test('metronome offers modern accent flash customization and preview', async ({ 
   await expect(controls).toBeVisible();
   await controls.getByRole('tab', { name: '소프트 글로우' }).click();
   await controls.getByRole('button', { name: '민트' }).click();
-  await controls.getByLabel('플래시 강도').fill('45');
+  await controls.getByLabel('플래시 강도').evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = '45';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await controls.getByLabel('플래시 길이').selectOption('long');
   await controls.getByRole('button', { name: '미리보기' }).click();
 
