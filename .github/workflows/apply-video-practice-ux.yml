@@ -8,6 +8,13 @@ on:
       - scripts/apply_video_practice_ux.py
       - scripts/run_video_practice_patch.py
       - .github/workflows/apply-video-practice-ux.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - scripts/apply_video_practice_ux.py
+      - scripts/run_video_practice_patch.py
+      - .github/workflows/apply-video-practice-ux.yml
   workflow_dispatch:
 
 permissions:
