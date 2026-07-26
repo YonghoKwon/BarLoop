@@ -3,7 +3,6 @@ import {
   GROOVE_PATTERNS,
   clonePattern,
   cycleStepLevel,
-  grooveById,
   routineTotalBars,
   type DrumInstrument,
   type DrumPattern,
