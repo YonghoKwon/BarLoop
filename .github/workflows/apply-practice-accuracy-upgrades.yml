@@ -3,6 +3,8 @@ name: Apply practice accuracy upgrades
 on:
   push:
     branches: [agent/practice-accuracy-and-coach-upgrades]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -34,4 +36,3 @@ jobs:
           git add -A
           git commit -m "Improve media practice accuracy and coaching"
           git push origin HEAD:agent/practice-accuracy-and-coach-upgrades
-# Triggered after the workflow was registered on the branch.
