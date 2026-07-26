@@ -3,6 +3,8 @@ name: Apply practice presets
 on:
   push:
     branches: [agent/practice-presets-and-full-bar-guide]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
