@@ -1,0 +1,449 @@
+/* iPhone 15 Pro / iPad Air 4 Safari layout refinements. */
+html {
+  min-height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
+button,
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+.shared-subdivision-guide,
+.subdivision-count-guide {
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.shared-subdivision-guide::-webkit-scrollbar,
+.subdivision-count-guide::-webkit-scrollbar {
+  display: none;
+}
+
+.shared-count-beat,
+.count-beat-group {
+  scroll-snap-align: center;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button,
+  select,
+  input[type="checkbox"] {
+    min-height: 44px;
+  }
+
+  input[type="range"] {
+    min-height: 44px;
+  }
+}
+
+/* iPad Air 4 portrait and landscape. */
+@media (min-width: 761px) and (max-width: 1180px) {
+  .app-shell {
+    padding-inline: max(18px, env(safe-area-inset-left));
+  }
+
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(330px, .85fr);
+    gap: 14px;
+  }
+
+  .controls-column {
+    display: flex;
+  }
+
+  .tools-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .shared-subdivision-guide {
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 7px;
+  }
+
+  .shared-count-beat {
+    flex: 1 0 auto;
+    min-width: 0;
+    gap: 3px;
+    padding: 4px;
+  }
+
+  .shared-count-beat span {
+    min-width: 30px;
+    min-height: 44px;
+    padding-inline: 4px;
+  }
+
+  .practice-overlay {
+    min-height: 100svh;
+    min-height: 100dvh;
+    gap: 14px;
+  }
+
+  .practice-readout strong {
+    font-size: clamp(4rem, 12vw, 7.5rem);
+  }
+
+  .practice-subdivision-guide {
+    width: 100%;
+    max-width: none;
+  }
+
+  .practice-subdivision-guide .shared-count-beat span {
+    min-width: 36px;
+  }
+
+  .lab-layout {
+    grid-template-columns: minmax(310px, .78fr) minmax(430px, 1.22fr);
+    gap: 14px;
+  }
+
+  .lab-stage {
+    min-height: calc(100svh - 150px);
+    min-height: calc(100dvh - 150px);
+  }
+
+  .subdivision-count-guide {
+    width: min(100%, 720px);
+    justify-content: flex-start;
+  }
+
+  .count-beat-group {
+    flex: 1 0 auto;
+  }
+}
+
+/* iPhone 15 Pro Safari portrait. */
+@media (max-width: 430px) {
+  .app-shell {
+    padding-inline: max(10px, env(safe-area-inset-left));
+  }
+
+  main {
+    gap: 12px;
+  }
+
+  .site-header {
+    padding-top: max(12px, env(safe-area-inset-top));
+    gap: 12px;
+  }
+
+  .site-header h1 {
+    font-size: 1.55rem;
+  }
+
+  .site-header p,
+  .privacy-badge {
+    font-size: .72rem;
+  }
+
+  .panel {
+    border-radius: 13px;
+  }
+
+  .source-panel,
+  .settings-panel,
+  .loop-panel,
+  .tool-panel {
+    padding: 12px;
+  }
+
+  .compact-grid.three,
+  .compact-grid.four,
+  .media-count-options {
+    grid-template-columns: 1fr;
+  }
+
+  .metronome-count-readout {
+    margin-top: 10px;
+  }
+
+  .metronome-count-readout strong {
+    font-size: clamp(2.8rem, 16vw, 4rem);
+  }
+
+  .shared-subdivision-guide {
+    width: calc(100% + 8px);
+    margin-inline: -4px;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 5px;
+    border-radius: 11px;
+  }
+
+  .shared-count-beat {
+    gap: 2px;
+    padding: 3px;
+    border-radius: 8px;
+  }
+
+  .shared-count-beat span {
+    min-width: 27px;
+    min-height: 42px;
+    padding: 3px 2px;
+    font-size: .82rem;
+  }
+
+  .shared-count-beat span strong {
+    font-size: .82rem;
+  }
+
+  .practice-overlay {
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow-y: auto;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  .practice-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding-block: 2px;
+    background: rgba(5, 6, 9, .92);
+    backdrop-filter: blur(12px);
+  }
+
+  .practice-readout {
+    gap: 8px;
+  }
+
+  .practice-readout strong {
+    font-size: clamp(3.2rem, 19vw, 5.2rem);
+  }
+
+  .practice-current-count {
+    font-size: clamp(3.1rem, 18vw, 5rem) !important;
+  }
+
+  .practice-subdivision-guide {
+    flex: 0 0 auto;
+    width: calc(100% + 4px);
+    margin-inline: -2px;
+  }
+
+  .practice-subdivision-guide .shared-count-beat span {
+    min-width: 27px;
+    min-height: 44px;
+  }
+
+  .practice-controls {
+    gap: 8px;
+  }
+
+  .practice-controls button {
+    min-height: 56px;
+    border-radius: 13px;
+    font-size: .88rem;
+  }
+
+  .sticky-mobile-controls {
+    bottom: env(safe-area-inset-bottom);
+  }
+
+  .metronome-lab-page {
+    min-height: 100svh;
+    min-height: 100dvh;
+    padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  .lab-header {
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .lab-header > :last-child {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    text-align: center;
+  }
+
+  .lab-header h1 {
+    font-size: 1.55rem;
+  }
+
+  .lab-header p {
+    font-size: .75rem;
+  }
+
+  .lab-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .lab-stage {
+    position: relative;
+    top: auto;
+    min-height: auto;
+    padding: 14px 10px;
+  }
+
+  .beat-orbit {
+    width: min(54vw, 205px);
+  }
+
+  .current-count-position {
+    max-width: 190px;
+    font-size: clamp(3.2rem, 17vw, 5.2rem);
+  }
+
+  .lab-bpm-row {
+    width: 100%;
+    grid-template-columns: 48px minmax(0, 1fr) 48px;
+    gap: 8px;
+    margin: 18px 0 12px;
+  }
+
+  .lab-bpm-row > button {
+    min-height: 50px;
+    border-radius: 13px;
+  }
+
+  .subdivision-count-guide {
+    width: calc(100% + 8px);
+    margin-inline: -4px;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .count-beat-group {
+    gap: 2px;
+    padding: 3px;
+  }
+
+  .count-beat-group span {
+    min-width: 27px;
+    min-height: 40px;
+    padding-inline: 2px;
+    padding-bottom: 12px;
+    font-size: .82rem;
+  }
+}
+
+/* iPhone landscape: preserve the whole bar and primary controls above Safari chrome. */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 950px) {
+  .site-header,
+  .source-panel,
+  footer {
+    display: none;
+  }
+
+  .app-shell {
+    padding: 6px max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  main,
+  .workspace-grid,
+  .controls-column,
+  .tools-grid {
+    gap: 8px;
+  }
+
+  .video-stage {
+    max-height: 46svh;
+    max-height: 46dvh;
+  }
+
+  .shared-subdivision-guide {
+    margin-block: 5px;
+  }
+
+  .shared-count-beat span {
+    min-height: 36px;
+  }
+
+  .practice-overlay {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, .85fr);
+    grid-template-rows: auto 1fr auto;
+    gap: 6px 10px;
+    overflow: hidden;
+  }
+
+  .practice-topbar,
+  .practice-progress {
+    grid-column: 1 / -1;
+  }
+
+  .practice-readout {
+    align-self: center;
+  }
+
+  .practice-subdivision-guide {
+    align-self: center;
+    max-height: none;
+  }
+
+  .practice-controls {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .practice-controls .practice-play {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .practice-controls button {
+    min-height: 46px;
+    font-size: .78rem;
+  }
+
+  .metronome-lab-page {
+    padding-block: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-bottom));
+  }
+
+  .lab-header {
+    margin-bottom: 6px;
+  }
+
+  .lab-header p,
+  .lab-footer {
+    display: none;
+  }
+
+  .lab-layout {
+    grid-template-columns: minmax(280px, .72fr) minmax(430px, 1.28fr);
+    gap: 8px;
+  }
+
+  .lab-stage {
+    min-height: calc(100svh - 70px);
+    min-height: calc(100dvh - 70px);
+    padding: 6px;
+  }
+
+  .beat-orbit {
+    width: min(34vh, 150px);
+  }
+
+  .current-count-position {
+    font-size: clamp(2.8rem, 13vh, 4.5rem);
+  }
+
+  .lab-bpm-row {
+    margin: 8px 0;
+  }
+
+  .subdivision-count-guide {
+    margin-top: 6px;
+  }
+}

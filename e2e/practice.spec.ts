@@ -43,6 +43,11 @@ async function loadLocalAudio(page: Page) {
   await expect(page.getByText('미디어를 불러왔습니다.', { exact: false })).toBeVisible();
 }
 
+async function expectNoPageOverflow(page: Page) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+}
+
 test('standalone metronome exposes the full subdivision guide', async ({ page }) => {
   await page.goto('/#metronome');
   await expect(page.getByRole('heading', { name: '드러머 메트로놈' })).toBeVisible();
@@ -52,6 +57,8 @@ test('standalone metronome exposes the full subdivision guide', async ({ page })
   await expect(guide).toContainText('e');
   await expect(guide).toContainText('&');
   await expect(guide).toContainText('a');
+  await expect(guide.locator('.count-beat-group')).toHaveCount(4);
+  await expectNoPageOverflow(page);
 });
 
 test('media practice keeps the guide moving with click output disabled', async ({ page }) => {
@@ -59,7 +66,10 @@ test('media practice keeps the guide moving with click output disabled', async (
   const panel = page.locator('section.metronome-panel');
   await subdivisionSelect(panel).selectOption('4');
   await countInSelect(panel).selectOption('0');
-  await expect(panel.getByLabel('한 마디 서브디비전 카운트')).toBeVisible();
+  const guide = panel.getByLabel('한 마디 서브디비전 카운트');
+  await expect(guide).toBeVisible();
+  await expect(guide.locator('.shared-count-beat')).toHaveCount(4);
+  await expectNoPageOverflow(page);
 
   await page.locator('.play-button').click();
   const activeLabel = panel.locator('.shared-count-beat span.active strong');
@@ -85,5 +95,8 @@ test('count-in and full practice overlay show the shared count grid', async ({ p
   const dialog = page.getByRole('dialog', { name: '드러머 연습 모드' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('DRUM PRACTICE')).toBeVisible();
-  await expect(dialog.getByLabel('한 마디 서브디비전 카운트')).toBeVisible();
+  const practiceGuide = dialog.getByLabel('한 마디 서브디비전 카운트');
+  await expect(practiceGuide).toBeVisible();
+  await expect(practiceGuide.locator('.shared-count-beat')).toHaveCount(4);
+  await expectNoPageOverflow(page);
 });

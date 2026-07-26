@@ -40,7 +40,8 @@ jobs:
         if: steps.unit-tests.outcome != 'success'
         run: exit 1
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
       - name: Run browser tests
         id: browser-tests
         continue-on-error: true
