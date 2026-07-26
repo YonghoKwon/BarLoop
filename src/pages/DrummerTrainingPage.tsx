@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import AccentFlashControls from '../components/AccentFlashControls';
 import BpmNumberInput from '../components/BpmNumberInput';
+import SubdivisionCountGuide from '../components/SubdivisionCountGuide';
 import DrummerTrainingSuite from '../components/DrummerTrainingSuite';
 import { preparePlaybackAudioSession, releasePlaybackAudioSession } from '../lib/audioPlaybackSession';
 import {
@@ -23,9 +24,16 @@ import {
   type DrumPattern,
   type PracticeRoutineStep,
 } from '../lib/drummerPractice';
-import { StandaloneMetronomeEngine, type StandaloneMetronomeSettings } from '../lib/standaloneMetronome';
+import { StandaloneMetronomeEngine, type MetronomeSound, type MetronomeSubdivision, type StandaloneMetronomeSettings } from '../lib/standaloneMetronome';
 
-const STORAGE_KEY = 'barloop:drummer-training:v2';
+const STORAGE_KEY = 'barloop:drummer-training:v3';
+const TRAINING_SOUNDS: Array<{ value: MetronomeSound; label: string }> = [
+  { value: 'classic', label: 'Classic' }, { value: 'wood', label: 'Wood Block' },
+  { value: 'rim', label: 'Rim' }, { value: 'cowbell', label: 'Cowbell' },
+  { value: 'digital', label: 'Digital' }, { value: 'clave', label: 'Clave' },
+  { value: 'shaker', label: 'Shaker' }, { value: 'low', label: 'Low Pulse' },
+];
+const TRAINING_SOUND_IDS = TRAINING_SOUNDS.map(({ value }) => value);
 const LEGACY_STORAGE_KEY = 'barloop:drummer-training:v1';
 const SWING_OPTIONS = [
   { value: 0.5, label: 'Straight · 50%' },
@@ -48,6 +56,14 @@ interface StoredTrainingSettings {
   movingAccentStep: number;
   routineSteps: PracticeRoutineStep[];
   accentFlashEnabled: boolean;
+  kitSize: 4 | 5;
+  guideClickEnabled: boolean;
+  guideSubdivision: MetronomeSubdivision;
+  clickVolume: number;
+  accentVolume: number;
+  subdivisionVolume: number;
+  sound: MetronomeSound;
+  accentSound: MetronomeSound;
   accentFlash: AccentFlashSettings;
 }
 
@@ -62,6 +78,14 @@ const DEFAULTS: StoredTrainingSettings = {
   movingAccentStep: 0,
   routineSteps: DEFAULT_ROUTINE,
   accentFlashEnabled: true,
+  kitSize: 4,
+  guideClickEnabled: true,
+  guideSubdivision: 2,
+  clickVolume: .42,
+  accentVolume: .72,
+  subdivisionVolume: .24,
+  sound: 'classic',
+  accentSound: 'wood',
   accentFlash: DEFAULT_ACCENT_FLASH_SETTINGS,
 };
 
@@ -82,7 +106,7 @@ function normalizeRoutine(value: unknown): PracticeRoutineStep[] {
 
 function readSettings(): StoredTrainingSettings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || '{}';
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('barloop:drummer-training:v2') || localStorage.getItem(LEGACY_STORAGE_KEY) || '{}';
     const stored = JSON.parse(raw) as Partial<StoredTrainingSettings>;
     const pattern = normalizePattern(stored.pattern);
     const totalSteps = patternStepCount(pattern.beatsPerBar);
@@ -97,6 +121,14 @@ function readSettings(): StoredTrainingSettings {
       movingAccentStep: Math.min(totalSteps - 1, Math.max(0, Math.round(Number(stored.movingAccentStep) || 0))),
       routineSteps: normalizeRoutine(stored.routineSteps),
       accentFlashEnabled: stored.accentFlashEnabled !== false,
+      kitSize: stored.kitSize === 5 ? 5 : 4,
+      guideClickEnabled: stored.guideClickEnabled !== false,
+      guideSubdivision: [1, 2, 3, 4].includes(Number(stored.guideSubdivision)) ? Number(stored.guideSubdivision) as MetronomeSubdivision : 2,
+      clickVolume: Math.min(1, Math.max(.05, Number(stored.clickVolume) || .42)),
+      accentVolume: Math.min(1, Math.max(.05, Number(stored.accentVolume) || .72)),
+      subdivisionVolume: Math.min(1, Math.max(0, Number(stored.subdivisionVolume) || .24)),
+      sound: TRAINING_SOUND_IDS.includes(stored.sound as MetronomeSound) ? stored.sound as MetronomeSound : 'classic',
+      accentSound: TRAINING_SOUND_IDS.includes(stored.accentSound as MetronomeSound) ? stored.accentSound as MetronomeSound : 'wood',
       accentFlash: normalizeAccentFlashSettings(stored.accentFlash),
     };
   } catch {
@@ -138,6 +170,16 @@ export default function DrummerTrainingPage() {
   const [routineIndex, setRoutineIndex] = useState(0);
   const [routineBarInStep, setRoutineBarInStep] = useState(0);
   const [accentFlashEnabled, setAccentFlashEnabled] = useState(initial.accentFlashEnabled);
+  const [kitSize, setKitSize] = useState<4 | 5>(initial.kitSize);
+  const [guideClickEnabled, setGuideClickEnabled] = useState(initial.guideClickEnabled);
+  const [guideSubdivision, setGuideSubdivision] = useState<MetronomeSubdivision>(initial.guideSubdivision);
+  const [clickVolume, setClickVolume] = useState(initial.clickVolume);
+  const [accentVolume, setAccentVolume] = useState(initial.accentVolume);
+  const [subdivisionVolume, setSubdivisionVolume] = useState(initial.subdivisionVolume);
+  const [sound, setSound] = useState<MetronomeSound>(initial.sound);
+  const [accentSound, setAccentSound] = useState<MetronomeSound>(initial.accentSound);
+  const [guideBeatInBar, setGuideBeatInBar] = useState(0);
+  const [guideSubdivisionInBeat, setGuideSubdivisionInBeat] = useState(0);
   const [accentFlash, setAccentFlash] = useState<AccentFlashSettings>(normalizeAccentFlashSettings(initial.accentFlash));
   const [running, setRunning] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -162,20 +204,24 @@ export default function DrummerTrainingPage() {
     bpm,
     beatsPerBar: pattern.beatsPerBar,
     subdivision: 4,
-    volume,
-    accentVolume: Math.min(1, volume + 0.2),
-    subdivisionVolume: volume,
+    volume: clickVolume,
+    accentVolume,
+    subdivisionVolume,
     swing: pattern.swing,
-    sound: 'classic',
+    sound,
+    accentSound,
     accents: Array.from({ length: pattern.beatsPerBar }, (_, index) => index === 0),
     gapEnabled: false,
     gapPlayBars: 4,
     gapMuteBars: 0,
+    clickEnabled: guideClickEnabled,
+    clickOverlayEnabled: guideClickEnabled,
+    guideSubdivision,
     rhythmEnabled,
     rhythmPattern: pattern,
     rhythmVolume: volume,
     movingAccentStep: accentTrainerEnabled ? movingAccentStep : null,
-  }), [accentTrainerEnabled, bpm, movingAccentStep, pattern, rhythmEnabled, volume]);
+  }), [accentSound, accentTrainerEnabled, accentVolume, bpm, clickVolume, guideClickEnabled, guideSubdivision, movingAccentStep, pattern, rhythmEnabled, sound, subdivisionVolume, volume]);
 
   const stop = useCallback(() => {
     engineRef.current.stop();
@@ -196,8 +242,16 @@ export default function DrummerTrainingPage() {
       routineSteps,
       accentFlashEnabled,
       accentFlash,
+      kitSize,
+      guideClickEnabled,
+      guideSubdivision,
+      clickVolume,
+      accentVolume,
+      subdivisionVolume,
+      sound,
+      accentSound,
     }));
-  }, [accentEveryBars, accentFlash, accentFlashEnabled, accentMode, accentTrainerEnabled, bpm, movingAccentStep, pattern, rhythmEnabled, routineSteps, volume]);
+  }, [accentEveryBars, accentFlash, accentFlashEnabled, accentSound, accentVolume, clickVolume, guideClickEnabled, guideSubdivision, kitSize, sound, subdivisionVolume, accentMode, accentTrainerEnabled, bpm, movingAccentStep, pattern, rhythmEnabled, routineSteps, volume]);
 
   useEffect(() => engineRef.current.update(settings), [settings]);
 
@@ -275,6 +329,9 @@ export default function DrummerTrainingPage() {
             routineBarRef.current = completedInStep;
             setRoutineBarInStep(completedInStep);
           }
+        }, undefined, (beat, subdivisionStep) => {
+          setGuideBeatInBar(beat);
+          setGuideSubdivisionInBeat(subdivisionStep);
         }),
       ]);
       setRunning(true);
@@ -405,6 +462,22 @@ export default function DrummerTrainingPage() {
           </div>
         </section>
 
+        <section className="panel training-audio-settings" aria-label="드럼 트레이닝 클릭 가이드 설정">
+          <div className="training-audio-header"><div><span className="eyebrow">CLICK GUIDE</span><h2>클릭 가이드·드럼 구성</h2></div><label className="switch-label"><input type="checkbox" checked={guideClickEnabled} onChange={(event) => setGuideClickEnabled(event.target.checked)} /><span>{guideClickEnabled ? 'ON' : 'OFF'}</span></label></div>
+          <div className="training-guide-readout"><span>현재 클릭</span><strong>{guideBeatInBar + 1}{guideSubdivision === 1 ? '' : guideSubdivision === 2 ? guideSubdivisionInBeat === 0 ? '' : ' &' : guideSubdivision === 3 ? ['',' trip',' let'][guideSubdivisionInBeat] : ['',' e',' &',' a'][guideSubdivisionInBeat]}</strong><small>{guideSubdivision === 1 ? '4분음표' : guideSubdivision === 2 ? '8분음표' : guideSubdivision === 3 ? '셋잇단' : '16분음표'}</small></div>
+          <SubdivisionCountGuide beatsPerBar={pattern.beatsPerBar} subdivision={guideSubdivision} beatInBar={guideBeatInBar} subdivisionInBeat={guideSubdivisionInBeat} audible={guideClickEnabled} compact />
+          <div className="compact-grid three training-settings-grid">
+            <label>드럼 구성<select value={kitSize} onChange={(event) => setKitSize(Number(event.target.value) === 5 ? 5 : 4)}><option value={4}>4피스 · 스몰+플로어 탐</option><option value={5}>5피스 · 스몰+미들+플로어 탐</option></select></label>
+            <label>클릭 서브디비전<select value={guideSubdivision} onChange={(event) => setGuideSubdivision(Number(event.target.value) as MetronomeSubdivision)}><option value={1}>4분음표</option><option value={2}>8분음표</option><option value={3}>셋잇단</option><option value={4}>16분음표</option></select></label>
+            <label>기본 클릭 음색<select value={sound} onChange={(event) => setSound(event.target.value as MetronomeSound)}>{TRAINING_SOUNDS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+            <label>강조 클릭 음색<select value={accentSound} onChange={(event) => setAccentSound(event.target.value as MetronomeSound)}>{TRAINING_SOUNDS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+            <label>기본 클릭 {Math.round(clickVolume * 100)}%<input type="range" min={.05} max={1} step={.05} value={clickVolume} onChange={(event) => setClickVolume(Number(event.target.value))} /></label>
+            <label>강조 클릭 {Math.round(accentVolume * 100)}%<input type="range" min={.05} max={1} step={.05} value={accentVolume} onChange={(event) => setAccentVolume(Number(event.target.value))} /></label>
+            <label>세부 박 클릭 {Math.round(subdivisionVolume * 100)}%<input type="range" min={0} max={1} step={.05} value={subdivisionVolume} onChange={(event) => setSubdivisionVolume(Number(event.target.value))} /></label>
+          </div>
+          <p className="kit-mode-hint">패턴 시퀀서는 계속 16분음표 해상도로 연주하고, 클릭 가이드는 4분·8분·셋잇단·16분 중에서 독립적으로 선택됩니다. 4피스는 스몰 탐과 플로어 탐, 5피스는 미들 탐이 추가됩니다.</p>
+        </section>
+
         <section className="panel training-accent-settings">
           <AccentFlashControls
             enabled={accentFlashEnabled}
@@ -418,6 +491,7 @@ export default function DrummerTrainingPage() {
 
         <DrummerTrainingSuite
           pattern={pattern}
+          kitSize={kitSize}
           rhythmEnabled={rhythmEnabled}
           activeStep={activeStep}
           onPatternChange={setPattern}

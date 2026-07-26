@@ -14,6 +14,7 @@ import {
 
 interface DrummerTrainingSuiteProps {
   pattern: DrumPattern;
+  kitSize: 4 | 5;
   rhythmEnabled: boolean;
   activeStep: number;
   onPatternChange: (pattern: DrumPattern) => void;
@@ -53,6 +54,7 @@ function meterGroupingLabel(beatsPerBar: number): string {
 
 export default function DrummerTrainingSuite({
   pattern,
+  kitSize,
   rhythmEnabled,
   activeStep,
   onPatternChange,
@@ -75,6 +77,7 @@ export default function DrummerTrainingSuite({
   onStopRoutine,
 }: DrummerTrainingSuiteProps) {
   const totalSteps = patternStepCount(pattern.beatsPerBar);
+  const visibleInstruments = DRUM_INSTRUMENTS.filter((instrument) => kitSize === 5 || instrument.id !== 'midTom');
   const beatColumns = Math.min(4, pattern.beatsPerBar);
   const meterStyle = { '--beat-columns': beatColumns } as CSSProperties;
   const accentStyle = { '--accent-columns': Math.min(16, totalSteps) } as CSSProperties;
@@ -153,7 +156,7 @@ export default function DrummerTrainingSuite({
         <div>
           <span className="eyebrow">DRUMMER TRAINING</span>
           <h2>리듬·루틴 트레이닝</h2>
-          <p className="subtle">2~12박의 4피스 드럼 세트와 심벌을 직접 편집하고 엇박·홀수 박자 루틴을 자동으로 이어 갑니다.</p>
+          <p className="subtle">2~12박의 4피스·5피스 드럼 세트와 심벌을 직접 편집하고 엇박·홀수 박자 루틴을 자동으로 이어 갑니다.</p>
         </div>
         <label className="switch-label">
           <input type="checkbox" checked={rhythmEnabled} onChange={(event) => onRhythmEnabledChange(event.target.checked)} />
@@ -200,7 +203,7 @@ export default function DrummerTrainingSuite({
         <div className="sequencer-meter-summary">
           <strong>{pattern.beatsPerBar}/4</strong>
           <span>추천 묶음 {meterGroupingLabel(pattern.beatsPerBar)}</span>
-          <span>총 {totalSteps}개의 16분 위치</span>
+          <span>총 {totalSteps}개의 16분 위치</span><span>{kitSize}피스 구성</span>
         </div>
 
         <div className="syncopation-actions">
@@ -228,9 +231,9 @@ export default function DrummerTrainingSuite({
         </div>
 
         <div className="drum-sequencer-grid">
-          {DRUM_INSTRUMENTS.map(({ id, label, short, family }) => (
+          {visibleInstruments.map(({ id, label, short, family }) => (
             <div className="drum-sequence-row" key={id}>
-              <div className={`instrument-label ${family}`} title={label}>
+              <div className={`instrument-label ${family}${id === 'midTom' ? ' optional-kit' : ''}`} title={label}>
                 <strong>{short}</strong>
                 <span>{label}</span>
               </div>

@@ -2,6 +2,7 @@ import {
   METRONOME_AUDIO_RESUME_EVENT,
   METRONOME_AUDIO_STATE_EVENT,
   type MetronomeAudioState,
+  type MetronomeSound,
 } from './standaloneMetronome';
 
 export type Subdivision = 1 | 2 | 3 | 4;
@@ -13,6 +14,10 @@ export interface MetronomeSettings {
   beatsPerBar: number;
   subdivision: Subdivision;
   volume: number;
+  accentVolume: number;
+  subdivisionVolume: number;
+  sound: MetronomeSound;
+  accentSound: MetronomeSound;
   playbackRate: number;
   firstDownbeat: number;
   syncOffsetMs: number;
@@ -27,6 +32,10 @@ interface CountInSettings {
   beatsPerBar: number;
   bars: number;
   volume: number;
+  accentVolume: number;
+  subdivisionVolume: number;
+  sound: MetronomeSound;
+  accentSound: MetronomeSound;
   subdivision: Subdivision;
   clickMode: CountInClickMode;
   clickEnabled: boolean;
@@ -186,7 +195,7 @@ export class MetronomeEngine {
           startAt + index * interval,
           subdivisionInBeat === 0 && beatInBar === 0,
           subdivisionInBeat !== 0,
-          settings.volume,
+          settings,
         );
       }
 
@@ -228,7 +237,7 @@ export class MetronomeEngine {
         this.schedule();
       }
       if (playConfirmationClick) {
-        this.scheduleClick(context.currentTime + 0.025, true, false, this.settings?.volume ?? 0.55);
+        this.scheduleClick(context.currentTime + 0.025, true, false, this.settings ?? { volume: .55, accentVolume: .82, subdivisionVolume: .3, sound: 'classic', accentSound: 'wood' });
       }
       this.notifyAudioState('running');
       return true;
@@ -238,9 +247,9 @@ export class MetronomeEngine {
     }
   }
 
-  async testClick(): Promise<void> {
+  async testClick(accent = false): Promise<void> {
     const context = await this.ensureContext();
-    this.scheduleClick(context.currentTime + 0.025, true, false, this.settings?.volume ?? 0.55);
+    this.scheduleClick(context.currentTime + 0.025, accent, false, this.settings ?? { volume: .55, accentVolume: .82, subdivisionVolume: .3, sound: 'classic', accentSound: 'wood' });
   }
 
   private schedule = (): void => {
@@ -290,7 +299,7 @@ export class MetronomeEngine {
           when,
           subdivisionInBeat === 0 && beatInBar === 0,
           subdivisionInBeat !== 0,
-          settings.volume,
+          settings,
         );
       }
       this.schedulePosition(when, beatInBar, subdivisionInBeat, shouldSound);
@@ -329,35 +338,32 @@ export class MetronomeEngine {
     when: number,
     accent: boolean,
     secondary: boolean,
-    volume: number,
+    settings: Pick<MetronomeSettings, 'volume' | 'accentVolume' | 'subdivisionVolume' | 'sound' | 'accentSound'>,
   ): void {
     const context = this.context;
     if (!context || context.state !== 'running') return;
-
+    const sound = accent ? settings.accentSound : settings.sound;
+    const config: Record<MetronomeSound, { type: OscillatorType; frequency: number; decay: number }> = {
+      classic: { type: 'sine', frequency: 1040, decay: .055 }, wood: { type: 'sine', frequency: 820, decay: .06 },
+      rim: { type: 'square', frequency: 1160, decay: .04 }, cowbell: { type: 'triangle', frequency: 560, decay: .09 },
+      digital: { type: 'square', frequency: 1480, decay: .027 }, clave: { type: 'triangle', frequency: 1780, decay: .042 },
+      shaker: { type: 'sawtooth', frequency: 6200, decay: .024 }, low: { type: 'sine', frequency: 320, decay: .078 },
+    };
+    const profile = config[sound];
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(accent ? 1450 : secondary ? 760 : 1050, when);
-
-    const level = clamp(volume, 0, 1) * (accent ? 0.9 : secondary ? 0.34 : 0.58);
-    gain.gain.setValueAtTime(0.0001, when);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, level), when + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, when + (secondary ? 0.035 : 0.055));
-
-    oscillator.connect(gain);
-    gain.connect(context.destination);
+    oscillator.type = profile.type;
+    oscillator.frequency.setValueAtTime(accent ? profile.frequency * 1.18 : secondary ? profile.frequency * .72 : profile.frequency, when);
+    const volume = accent ? settings.accentVolume : secondary ? settings.subdivisionVolume : settings.volume;
+    const level = clamp(volume, 0, 1) * (accent ? .95 : secondary ? .45 : .72);
+    const decay = secondary ? Math.min(profile.decay, .032) : profile.decay;
+    gain.gain.setValueAtTime(.0001, when);
+    gain.gain.exponentialRampToValueAtTime(Math.max(.0002, level), when + .003);
+    gain.gain.exponentialRampToValueAtTime(.0001, when + decay);
+    oscillator.connect(gain); gain.connect(context.destination);
     this.scheduledSources.add(oscillator);
-    oscillator.addEventListener(
-      'ended',
-      () => {
-        this.scheduledSources.delete(oscillator);
-        oscillator.disconnect();
-        gain.disconnect();
-      },
-      { once: true },
-    );
-    oscillator.start(when);
-    oscillator.stop(when + 0.075);
+    oscillator.addEventListener('ended', () => { this.scheduledSources.delete(oscillator); oscillator.disconnect(); gain.disconnect(); }, { once: true });
+    oscillator.start(when); oscillator.stop(when + decay + .02);
   }
 
   private clearPositionTimers(): void {

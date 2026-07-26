@@ -12,6 +12,7 @@ import './drummer-training.css';
 import './drummer-training-page.css';
 import './variable-meter.css';
 import './accent-flash-enhanced.css';
+import './practice-ux-v2.css';
 
 // Keep the three practice surfaces and their mobile layouts in the same PWA bundle.
 if ('serviceWorker' in navigator) {

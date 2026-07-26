@@ -23,7 +23,11 @@ export interface StandaloneMetronomeSettings {
   subdivisionVolume: number;
   swing: number;
   sound: MetronomeSound;
+  accentSound?: MetronomeSound;
   accents: boolean[];
+  clickEnabled?: boolean;
+  clickOverlayEnabled?: boolean;
+  guideSubdivision?: MetronomeSubdivision;
   gapEnabled: boolean;
   gapPlayBars: number;
   gapMuteBars: number;
@@ -76,6 +80,7 @@ export class StandaloneMetronomeEngine {
   private settings: StandaloneMetronomeSettings | null = null;
   private onTick: ((tick: MetronomeTick) => void) | null = null;
   private onAudioState: ((state: MetronomeAudioState) => void) | null = null;
+  private onGuideTick: ((beatInBar: number, subdivisionInBeat: number, subdivision: MetronomeSubdivision) => void) | null = null;
   private wakeLock: WakeLockSentinel | null = null;
   private lifecycleAttached = false;
   private tickTimers = new Set<number>();
@@ -113,11 +118,13 @@ export class StandaloneMetronomeEngine {
     settings: StandaloneMetronomeSettings,
     onTick?: (tick: MetronomeTick) => void,
     onAudioState?: (state: MetronomeAudioState) => void,
+    onGuideTick?: (beatInBar: number, subdivisionInBeat: number, subdivision: MetronomeSubdivision) => void,
   ): Promise<void> {
     this.stop();
     this.settings = settings;
     this.onTick = onTick ?? null;
     this.onAudioState = onAudioState ?? null;
+    this.onGuideTick = onGuideTick ?? null;
     this.attachLifecycleListeners();
     this.notifyAudioState('starting');
 
@@ -159,6 +166,7 @@ export class StandaloneMetronomeEngine {
     this.notifyAudioState('idle');
     this.onTick = null;
     this.onAudioState = null;
+    this.onGuideTick = null;
   }
 
   isRunning(): boolean {
@@ -252,9 +260,11 @@ export class StandaloneMetronomeEngine {
     if (audible) {
       if (settings.rhythmEnabled && settings.rhythmPattern && settings.subdivision === 4) {
         const sounded = this.scheduleDrumPatternStep(when, stepInBar, movingAccent, settings);
-        if (movingAccent && !sounded) this.scheduleClick(when, true, true, settings);
-      } else {
-        this.scheduleClick(when, accented, subdivisionInBeat !== 0, settings);
+        if (settings.clickOverlayEnabled) this.scheduleGuideOverlay(when, beatInBar, subdivisionInBeat, settings);
+        if (movingAccent && !sounded && !settings.clickOverlayEnabled) this.scheduleClick(when, true, true, settings);
+      } else if (settings.clickEnabled !== false) {
+        if (settings.guideSubdivision) this.scheduleGuideOverlay(when, beatInBar, subdivisionInBeat, settings);
+        else this.scheduleClick(when, accented, subdivisionInBeat !== 0, settings);
       }
     }
 
@@ -263,6 +273,35 @@ export class StandaloneMetronomeEngine {
       this.tickTimers.delete(timer);
       if (!this.running) return;
       this.onTick?.({ beatInBar, subdivisionInBeat, barIndex, stepInBar, audible });
+    }, delay);
+    this.tickTimers.add(timer);
+  }
+
+  private scheduleGuideOverlay(when: number, beatInBar: number, sixteenthStep: number, settings: StandaloneMetronomeSettings): void {
+    const guide = settings.guideSubdivision ?? 1;
+    const accentBeat = Boolean(settings.accents[beatInBar]);
+    if (guide === 3) {
+      if (sixteenthStep !== 0) return;
+      const beatDuration = 60 / clamp(settings.bpm, 20, 400);
+      for (let index = 0; index < 3; index += 1) {
+        const at = when + index * beatDuration / 3;
+        this.scheduleClick(at, index === 0 && accentBeat, index > 0, settings);
+        this.scheduleGuideTick(at, beatInBar, index, guide);
+      }
+      return;
+    }
+    const shouldClick = guide === 1 ? sixteenthStep === 0 : guide === 2 ? sixteenthStep % 2 === 0 : true;
+    if (!shouldClick) return;
+    const guideStep = guide === 1 ? 0 : guide === 2 ? Math.floor(sixteenthStep / 2) : sixteenthStep;
+    this.scheduleClick(when, guideStep === 0 && accentBeat, guideStep > 0, settings);
+    this.scheduleGuideTick(when, beatInBar, guideStep, guide);
+  }
+
+  private scheduleGuideTick(when: number, beatInBar: number, subdivisionInBeat: number, subdivision: MetronomeSubdivision): void {
+    const delay = Math.max(0, (when - (this.context?.currentTime ?? when)) * 1000);
+    const timer = window.setTimeout(() => {
+      this.tickTimers.delete(timer);
+      if (this.running) this.onGuideTick?.(beatInBar, subdivisionInBeat, subdivision);
     }, delay);
     this.tickTimers.add(timer);
   }
@@ -301,7 +340,8 @@ export class StandaloneMetronomeEngine {
       crash: 0.18,
       ride: 0.13,
       hihat: 0.035,
-      rackTom: 0.13,
+      rackTom: 0.12,
+      midTom: 0.14,
       floorTom: 0.16,
       snare: 0.07,
       kick: 0.11,
@@ -319,9 +359,12 @@ export class StandaloneMetronomeEngine {
     } else if (instrument === 'floorTom') {
       oscillator.frequency.setValueAtTime(accent ? 155 : 132, when);
       oscillator.frequency.exponentialRampToValueAtTime(72, when + decay);
+    } else if (instrument === 'midTom') {
+      oscillator.frequency.setValueAtTime(accent ? 195 : 170, when);
+      oscillator.frequency.exponentialRampToValueAtTime(92, when + decay);
     } else if (instrument === 'rackTom') {
-      oscillator.frequency.setValueAtTime(accent ? 235 : 205, when);
-      oscillator.frequency.exponentialRampToValueAtTime(118, when + decay);
+      oscillator.frequency.setValueAtTime(accent ? 265 : 230, when);
+      oscillator.frequency.exponentialRampToValueAtTime(138, when + decay);
     } else if (instrument === 'snare') {
       oscillator.frequency.setValueAtTime(accent ? 255 : 205, when);
     } else if (instrument === 'ride') {
@@ -358,7 +401,7 @@ export class StandaloneMetronomeEngine {
 
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    const sound = settings.sound;
+    const sound = accent ? settings.accentSound ?? settings.sound : settings.sound;
 
     const soundConfig: Record<MetronomeSound, { type: OscillatorType; frequency: number; decay: number }> = {
       classic: { type: 'sine', frequency: 1040, decay: 0.055 },
