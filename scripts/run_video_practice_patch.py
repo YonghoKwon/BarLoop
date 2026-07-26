@@ -66,6 +66,23 @@ app = app.replace(
 )
 app_path.write_text(app, encoding='utf-8')
 
+# Preserve the established practice-mode name while keeping the newer BarLoop brand.
+overlay_path = ROOT / 'src' / 'components' / 'PracticeModeOverlay.tsx'
+overlay = overlay_path.read_text(encoding='utf-8')
+overlay = replace_once(overlay, 'BARLOOP PRACTICE', 'DRUM PRACTICE · BARLOOP', 'practice overlay brand')
+overlay_path.write_text(overlay, encoding='utf-8')
+
+# Distinguish numbered bar cells from duration preset buttons for touch and accessibility.
+bar_picker_path = ROOT / 'src' / 'components' / 'BarRangePicker.tsx'
+bar_picker = bar_picker_path.read_text(encoding='utf-8')
+bar_picker = replace_once(
+    bar_picker,
+    "aria-label={`${bar.index + 1}마디${current ? ' 현재 재생' : ''}${selected ? ' 반복 선택' : ''}`}",
+    "aria-label={`${bar.index + 1}번 마디${current ? ' 현재 재생' : ''}${selected ? ' 반복 선택' : ''}`}",
+    'numbered bar accessibility label',
+)
+bar_picker_path.write_text(bar_picker, encoding='utf-8')
+
 # Media metronome click profiles.
 media_engine_path = ROOT / 'src' / 'lib' / 'metronome.ts'
 media_engine = media_engine_path.read_text(encoding='utf-8')
