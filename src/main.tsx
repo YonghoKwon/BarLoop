@@ -10,7 +10,7 @@ import './ios-overflow-fix.css';
 import './full-bar-guide.css';
 import './drummer-training.css';
 
-// Keep feature styles explicit so mobile Safari loads the complete training UI.
+// Load every training stylesheet before booting the PWA on mobile Safari.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     void navigator.serviceWorker.register('./sw.js').catch(() => undefined);
