@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import AccentFlashControls from '../components/AccentFlashControls';
 import BpmNumberInput from '../components/BpmNumberInput';
 import { preparePlaybackAudioSession, releasePlaybackAudioSession } from '../lib/audioPlaybackSession';
+import {
+  DEFAULT_ACCENT_FLASH_SETTINGS,
+  accentFlashClassName,
+  accentFlashInlineStyle,
+  normalizeAccentFlashSettings,
+  type AccentFlashSettings,
+} from '../lib/accentFlash';
 import { clampBpm } from '../lib/bpm';
 import {
   buildSubdivisionCountGroups,
@@ -72,6 +80,7 @@ interface StoredSettings {
   timerMinutes: number;
   presetIndex: number;
   accentFlashEnabled: boolean;
+  accentFlash: AccentFlashSettings;
 }
 
 const DEFAULTS: StoredSettings = {
@@ -95,6 +104,7 @@ const DEFAULTS: StoredSettings = {
   timerMinutes: 10,
   presetIndex: 1,
   accentFlashEnabled: true,
+  accentFlash: DEFAULT_ACCENT_FLASH_SETTINGS,
 };
 
 function readSettings(): StoredSettings {
@@ -114,6 +124,7 @@ function readSettings(): StoredSettings {
       accents: Array.from({ length: beatsPerBar }, (_, index) => stored.accents?.[index] ?? index === 0),
       presetIndex: Math.min(PRACTICE_PRESETS.length - 1, Math.max(0, Math.round(Number(stored.presetIndex) || 0))),
       accentFlashEnabled: stored.accentFlashEnabled !== false,
+      accentFlash: normalizeAccentFlashSettings(stored.accentFlash),
     };
   } catch {
     return DEFAULTS;
@@ -168,6 +179,7 @@ export default function MetronomePage() {
   const [timerMinutes, setTimerMinutes] = useState(initial.timerMinutes);
   const [presetIndex, setPresetIndex] = useState(initial.presetIndex);
   const [accentFlashEnabled, setAccentFlashEnabled] = useState(initial.accentFlashEnabled);
+  const [accentFlash, setAccentFlash] = useState<AccentFlashSettings>(normalizeAccentFlashSettings(initial.accentFlash));
   const [running, setRunning] = useState(false);
   const [beatInBar, setBeatInBar] = useState(0);
   const [subdivisionInBeat, setSubdivisionInBeat] = useState(0);
@@ -219,8 +231,9 @@ export default function MetronomePage() {
       timerMinutes,
       presetIndex,
       accentFlashEnabled,
+      accentFlash,
     }));
-  }, [accentFlashEnabled, countMode, presetIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]);
+  }, [accentFlash, accentFlashEnabled, countMode, presetIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]);
 
   useEffect(() => engineRef.current.update(engineSettings), [engineSettings]);
 
@@ -347,7 +360,7 @@ export default function MetronomePage() {
         <section className="lab-stage panel">
           <div className="meter-stage-status"><strong>{beatsPerBar}/4</strong><span>{grouping.join('+')} 묶음</span></div>
           <div className={audible ? 'beat-orbit' : 'beat-orbit muted'}>
-            {accentFlashEnabled && flashPulse > 0 && <i key={flashPulse} className="accent-flash-wave metronome-flash" />}
+            {accentFlashEnabled && flashPulse > 0 && <i key={flashPulse} data-testid="accent-flash-effect" className={accentFlashClassName('metronome-flash', accentFlash)} style={accentFlashInlineStyle(accentFlash)} />}
             <div className="beat-number current-count-position">{currentCount}</div>
             <span>{audible ? (countMode === 'voice' ? 'VOICE' : countMode === 'both' ? 'BOTH' : 'CLICK') : 'GAP'}</span>
           </div>
@@ -390,7 +403,7 @@ export default function MetronomePage() {
 
         <div className="lab-controls">
           <section className="panel lab-panel">
-            <div className="section-title-row"><h2>박자와 악센트</h2><label className="switch-label"><input type="checkbox" checked={accentFlashEnabled} onChange={(event) => setAccentFlashEnabled(event.target.checked)} /><span>강세 플래시</span></label></div>
+            <div className="section-title-row"><h2>박자와 악센트</h2><span>{beatsPerBar}/4</span></div>
             <div className="compact-grid three">
               <label>박자 수<select value={beatsPerBar} onChange={(event) => setBeatsPerBar(Number(event.target.value))}>{Array.from({ length: 11 }, (_, index) => index + 2).map((value) => <option key={value}>{value}</option>)}</select></label>
               <label>서브디비전<select value={subdivision} onChange={(event) => setSubdivision(Number(event.target.value) as MetronomeSubdivision)}><option value={1}>4분음표</option><option value={2}>8분음표</option><option value={3}>셋잇단</option><option value={4}>16분음표</option></select></label>
@@ -400,6 +413,17 @@ export default function MetronomePage() {
             <div className="accent-sequencer variable-accent-sequencer" style={guideStyle}>
               {accents.map((active, index) => <button key={index} type="button" className={active ? 'active' : ''} onClick={() => setAccents((current) => current.map((value, item) => item === index ? !value : value))}><strong>{index + 1}</strong><span>{active ? '강세' : '보통'}</span></button>)}
             </div>
+          </section>
+
+          <section className="panel lab-panel accent-flash-panel">
+            <AccentFlashControls
+              enabled={accentFlashEnabled}
+              toggleLabel="강세 플래시"
+              settings={accentFlash}
+              onEnabledChange={setAccentFlashEnabled}
+              onSettingsChange={setAccentFlash}
+              onPreview={() => { setAccentFlashEnabled(true); setFlashPulse((value) => value + 1); }}
+            />
           </section>
 
           <section className="panel lab-panel">

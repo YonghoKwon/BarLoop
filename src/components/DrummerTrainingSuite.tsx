@@ -36,7 +36,7 @@ interface DrummerTrainingSuiteProps {
   onStopRoutine: () => void;
 }
 
-const SUBDIVISION_LABELS = ['숫자', 'e', '&', 'a'];
+const SUBDIVISION_LABELS = ['정박', 'e', '&', 'a'];
 
 function countLabel(index: number): string {
   const beat = Math.floor(index / 4) + 1;
@@ -206,16 +206,24 @@ export default function DrummerTrainingSuite({
         <div className="syncopation-actions">
           <div>
             <strong>엇박 빠른 만들기</strong>
-            <span>숫자 박이 아닌 e·&·a 위치를 자동 배치한 뒤 각 칸을 자유롭게 수정할 수 있습니다.</span>
+            <span>&는 박과 박 사이의 8분 엇박이고, e·a는 그보다 더 잘게 나눈 16분 사이 위치입니다. 정박 악기를 남겨 두는 것은 박을 잃지 않기 위한 기준점입니다.</span>
           </div>
           <button type="button" onClick={() => applySyncopationTemplate('eighth')}>모든 &에 8분 엇박</button>
           <button type="button" onClick={() => applySyncopationTemplate('sixteenth')}>e·&·a 싱코페이션</button>
         </div>
 
+        <div className="syncopation-explainer" aria-label="엇박 이해하기">
+          <div className="downbeat-card"><strong>1 · 2 · 3 · 4</strong><span>정박 · 숫자를 세는 기본 박</span></div>
+          <div className="eighth-card"><strong>1 & 2 & 3 & 4 &</strong><span>8분 엇박 · 각 박의 정확한 중간</span></div>
+          <div className="sixteenth-card"><strong>1 e & a</strong><span>16분 사이 · e와 a는 더 세밀한 싱코페이션 위치</span></div>
+        </div>
+
         <div className="sequencer-legend" aria-hidden="true">
           <span><i className="legend-dot normal" />일반 타격</span>
           <span><i className="legend-dot accent" />강세 타격</span>
-          <span><i className="legend-dot offbeat" />엇박 위치</span>
+          <span><i className="legend-dot downbeat" />정박·숫자</span>
+          <span><i className="legend-dot eighth-offbeat" />8분 엇박·&</span>
+          <span><i className="legend-dot sixteenth-between" />16분 사이·e/a</span>
           <span><i className="legend-dot playhead" />현재 위치</span>
         </div>
 
@@ -232,7 +240,7 @@ export default function DrummerTrainingSuite({
                     <div className="drum-beat-heading"><strong>{beatIndex + 1}박</strong><span>{beatIndex * 4 + 1}–{beatIndex * 4 + 4}칸</span></div>
                     <div className="drum-substep-labels" aria-hidden="true">
                       {SUBDIVISION_LABELS.map((labelText, subIndex) => (
-                        <span key={labelText} className={subIndex > 0 ? 'offbeat-label' : ''}>{subIndex === 0 ? beatIndex + 1 : labelText}</span>
+                        <span key={labelText} className={subIndex === 0 ? 'downbeat-label' : subIndex === 2 ? 'eighth-offbeat-label' : 'sixteenth-between-label'}>{subIndex === 0 ? beatIndex + 1 : labelText}</span>
                       ))}
                     </div>
                     <div className="drum-substep-grid">
@@ -246,10 +254,11 @@ export default function DrummerTrainingSuite({
                             className={[
                               subIndex > 0 ? 'offbeat-cell' : 'downbeat-cell',
                               subIndex === 2 ? 'ampersand-cell' : '',
+                              subIndex === 2 ? 'eighth-offbeat-cell' : subIndex > 0 ? 'sixteenth-between-cell' : '',
                               level === 2 ? 'accent' : level === 1 ? 'on' : '',
                               activeStep === stepIndex ? 'playhead' : '',
                             ].filter(Boolean).join(' ')}
-                            aria-label={`${label} ${countLabel(stepIndex)} ${subIndex > 0 ? '엇박' : '정박'} ${level === 2 ? '강세' : level === 1 ? '일반' : '무음'}`}
+                            aria-label={`${label} ${countLabel(stepIndex)} ${subIndex === 0 ? '정박' : subIndex === 2 ? '8분 엇박' : '16분 사이'} ${level === 2 ? '강세' : level === 1 ? '일반' : '무음'}`}
                             onClick={() => updateCell(id, stepIndex)}
                           >
                             {level === 2 ? '●' : level === 1 ? '·' : ''}
