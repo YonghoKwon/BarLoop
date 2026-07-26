@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 function createWavBuffer(durationSeconds = 4, sampleRate = 8000): Buffer {
   const samples = Math.round(durationSeconds * sampleRate);
@@ -48,6 +48,16 @@ async function expectNoPageOverflow(page: Page) {
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
+async function expectFullBarWithoutInternalScroll(guide: Locator) {
+  const metrics = await guide.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+    cellCount: element.querySelectorAll(':scope > div > span').length,
+  }));
+  expect(metrics.cellCount).toBe(16);
+  expect(metrics.scrollWidth - metrics.clientWidth).toBeLessThanOrEqual(1);
+}
+
 test('standalone metronome exposes the full subdivision guide', async ({ page }) => {
   await page.goto('/#metronome');
   await expect(page.getByRole('heading', { name: '드러머 메트로놈' })).toBeVisible();
@@ -58,7 +68,19 @@ test('standalone metronome exposes the full subdivision guide', async ({ page })
   await expect(guide).toContainText('&');
   await expect(guide).toContainText('a');
   await expect(guide.locator('.count-beat-group')).toHaveCount(4);
+  await expectFullBarWithoutInternalScroll(guide);
   await expectNoPageOverflow(page);
+});
+
+test('practice presets apply useful metronome settings', async ({ page }) => {
+  await page.goto('/#metronome');
+  await page.getByLabel('연습 프리셋 선택').selectOption({ label: '내부 박자 점검' });
+  await page.getByRole('button', { name: '이 설정으로 연습 준비' }).click();
+
+  await expect(page.getByLabel('메트로놈 BPM')).toHaveValue('100');
+  const gapPanel = page.locator('section.lab-panel').filter({ has: page.getByRole('heading', { name: 'Gap Click' }) });
+  await expect(gapPanel.locator('input[type="checkbox"]')).toBeChecked();
+  await expect(page.getByText('내부 박자 점검 프리셋을 적용했습니다.', { exact: false })).toBeVisible();
 });
 
 test('media practice keeps the guide moving with click output disabled', async ({ page }) => {
@@ -69,6 +91,7 @@ test('media practice keeps the guide moving with click output disabled', async (
   const guide = panel.getByLabel('한 마디 서브디비전 카운트');
   await expect(guide).toBeVisible();
   await expect(guide.locator('.shared-count-beat')).toHaveCount(4);
+  await expectFullBarWithoutInternalScroll(guide);
   await expectNoPageOverflow(page);
 
   await page.locator('.play-button').click();

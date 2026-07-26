@@ -31,7 +31,12 @@ export default function SubdivisionCountGuide({
 
   return (
     <div
-      className={['shared-subdivision-guide', compact ? 'compact' : '', className].filter(Boolean).join(' ')}
+      className={[
+        'shared-subdivision-guide',
+        beatsPerBar <= 4 ? 'fit-full-bar' : '',
+        compact ? 'compact' : '',
+        className,
+      ].filter(Boolean).join(' ')}
       aria-label="한 마디 서브디비전 카운트"
     >
       {groups.map((labels, countBeatIndex) => (
