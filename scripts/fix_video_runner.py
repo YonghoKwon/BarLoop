@@ -11,19 +11,34 @@ text, settings_count = re.subn(
     count=1,
     flags=re.DOTALL,
 )
-text, marker_count = re.subn(
-    r"^marker = .*$",
-    "marker = 'app = replace_once(app, \\\"            <div className='",
+text, current_patch_count = re.subn(
+    r"current_before_clock =.*?(?=script = script\.replace\(\n    'page = replace_once)",
+    "",
     text,
     count=1,
-    flags=re.MULTILINE,
+    flags=re.DOTALL,
 )
-needle = "app = app.replace(',\\n  type MouseEvent,', '')"
-replacement = "app = app.replace(\"const SETTINGS_KEY = 'barloop:practice-settings:v4';\", \"const SETTINGS_KEY = 'barloop:practice-settings:v4';\\nconst LEGACY_SETTINGS_KEY = 'barloop:practice-settings:v3';\")\n" + needle
-if needle not in text:
-    raise RuntimeError('Could not find App compatibility section in video runner.')
-text = text.replace(needle, replacement, 1)
 
-if settings_count != 1 or marker_count != 1:
+needle = "app = app_path.read_text(encoding='utf-8')"
+move_block = '''app = app_path.read_text(encoding='utf-8')
+current_start = app.find('  const currentBarIndex = useMemo(() => {')
+if current_start >= 0:
+    current_end = app.index('\n\n  const activeLoop', current_start)
+    current_block = app[current_start:current_end]
+    app = app[:current_start] + app[current_end:]
+    seek_index = app.index('  const seekTo = useCallback((seconds: number) => {')
+    app = app[:seek_index] + current_block + '\n\n' + app[seek_index:]
+'''
+if needle not in text:
+    raise RuntimeError('Could not find App post-processing section in video runner.')
+text = text.replace(needle, move_block.rstrip(), 1)
+
+mouse_needle = "app = app.replace(',\\n  type MouseEvent,', '')"
+settings_replacement = "app = app.replace(\"const SETTINGS_KEY = 'barloop:practice-settings:v4';\", \"const SETTINGS_KEY = 'barloop:practice-settings:v4';\\nconst LEGACY_SETTINGS_KEY = 'barloop:practice-settings:v3';\")\n" + mouse_needle
+if mouse_needle not in text:
+    raise RuntimeError('Could not find App compatibility section in video runner.')
+text = text.replace(mouse_needle, settings_replacement, 1)
+
+if settings_count != 1 or current_patch_count != 1:
     raise RuntimeError('Could not update video practice runner setup.')
 path.write_text(text, encoding='utf-8')
