@@ -14,6 +14,7 @@ export interface PlayerHandle {
   getCurrentTime: () => number;
   getDuration: () => number;
   setPlaybackRate: (rate: number) => void;
+  setVolume: (volume: number) => void;
 }
 
 export interface PlayerCallbacks {
