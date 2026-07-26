@@ -1,0 +1,127 @@
+/* Keep a complete 4/4 subdivision bar visible on iPhone without entering practice mode. */
+@media (max-width: 430px) {
+  .shared-subdivision-guide.fit-full-bar,
+  .subdivision-count-guide.fit-full-bar,
+  .subdivision-count-guide:has(> .count-beat-group:nth-child(4):last-child) {
+    width: 100%;
+    max-width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    justify-content: stretch;
+    gap: 2px;
+    margin-inline: 0;
+    padding: 4px;
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+
+  .shared-subdivision-guide.fit-full-bar .shared-count-beat,
+  .subdivision-count-guide.fit-full-bar .count-beat-group,
+  .subdivision-count-guide:has(> .count-beat-group:nth-child(4):last-child) .count-beat-group {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    padding: 2px;
+    border-radius: 7px;
+  }
+
+  .shared-subdivision-guide.fit-full-bar .shared-count-beat:has(> span:nth-child(3):last-child) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .shared-subdivision-guide.fit-full-bar .shared-count-beat span,
+  .subdivision-count-guide.fit-full-bar .count-beat-group span,
+  .subdivision-count-guide:has(> .count-beat-group:nth-child(4):last-child) .count-beat-group span {
+    min-width: 0 !important;
+    min-height: 38px;
+    padding: 3px 0 2px;
+    font-size: clamp(.66rem, 2.8vw, .76rem);
+  }
+
+  .shared-subdivision-guide.fit-full-bar .shared-count-beat span strong {
+    font-size: inherit;
+  }
+
+  .shared-subdivision-guide.fit-full-bar .shared-count-beat span.active,
+  .subdivision-count-guide.fit-full-bar .count-beat-group span.active,
+  .subdivision-count-guide:has(> .count-beat-group:nth-child(4):last-child) .count-beat-group span.active {
+    transform: scale(1.04);
+  }
+
+  .shared-subdivision-guide.fit-full-bar .shared-count-beat span i {
+    width: 5px;
+    height: 5px;
+  }
+
+  .subdivision-count-guide.fit-full-bar .count-beat-group span::after,
+  .subdivision-count-guide:has(> .count-beat-group:nth-child(4):last-child) .count-beat-group span::after {
+    width: 5px;
+    height: 5px;
+  }
+}
+
+/* Useful practice presets replace the previous read-only rudiment text. */
+.practice-preset-panel .section-title-row {
+  align-items: flex-start;
+}
+
+.practice-preset-panel .section-title-row > div {
+  min-width: 0;
+}
+
+.practice-preset-panel select {
+  width: min(220px, 48%);
+}
+
+.practice-preset-summary {
+  margin-top: 12px;
+  padding: 13px;
+  border: 1px solid #2d3545;
+  border-radius: 12px;
+  background: #0d1017;
+}
+
+.practice-preset-summary strong,
+.practice-preset-summary p {
+  display: block;
+}
+
+.practice-preset-summary p {
+  margin: 6px 0 10px;
+  color: var(--text-muted);
+  font-size: .8rem;
+  line-height: 1.55;
+}
+
+.practice-preset-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.practice-preset-tags span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 106, 61, .1);
+  color: #ffd0c2;
+  font-size: .72rem;
+  font-weight: 750;
+}
+
+.practice-preset-panel > .primary-button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+@media (max-width: 430px) {
+  .practice-preset-panel .section-title-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .practice-preset-panel select {
+    width: 100%;
+  }
+}
