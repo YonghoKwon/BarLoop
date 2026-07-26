@@ -1,0 +1,52 @@
+.media-practice-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.media-practice-panel label {
+  display: grid;
+  gap: 8px;
+}
+
+.media-practice-panel input[type='range'] {
+  width: 100%;
+}
+
+.entry-play-button {
+  align-self: end;
+  min-height: 44px;
+}
+
+.fill-trainer-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto auto;
+  gap: 9px;
+  align-items: center;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.fill-trainer-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.fill-trainer-row span {
+  color: #9ca6b9;
+  font-size: .78rem;
+}
+
+.fill-trainer-row button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .fill-trainer-row {
+    grid-template-columns: 1fr;
+  }
+
+  .fill-trainer-row button {
+    width: 100%;
+  }
+}

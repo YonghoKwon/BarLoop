@@ -18,7 +18,9 @@ export default function AppUtilities() {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState('저장됨');
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [updateWorker, setUpdateWorker] = useState<ServiceWorker | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const refreshingRef = useRef(false);
 
   useEffect(() => {
     const onStorage = () => {
@@ -46,6 +48,45 @@ export default function AppUtilities() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    let disposed = false;
+    let registration: ServiceWorkerRegistration | undefined;
+
+    const watchInstalling = (worker: ServiceWorker | null) => {
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (!disposed && worker.state === 'installed' && navigator.serviceWorker.controller) {
+          setUpdateWorker(registration?.waiting ?? worker);
+          setSaved('새 버전 있음');
+        }
+      });
+    };
+
+    void navigator.serviceWorker.getRegistration().then((nextRegistration) => {
+      if (disposed || !nextRegistration) return;
+      registration = nextRegistration;
+      if (registration.waiting) {
+        setUpdateWorker(registration.waiting);
+        setSaved('새 버전 있음');
+      }
+      watchInstalling(registration.installing);
+      registration.addEventListener('updatefound', () => watchInstalling(registration?.installing ?? null));
+      void registration.update();
+    });
+
+    const handleControllerChange = () => {
+      if (refreshingRef.current) return;
+      refreshingRef.current = true;
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+    return () => {
+      disposed = true;
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+    };
+  }, []);
+
   const diagnostics = useMemo(() => ({
     browser: navigator.userAgent,
     webAudio: Boolean(window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext),
@@ -70,7 +111,7 @@ export default function AppUtilities() {
       const key = localStorage.key(index);
       if (key?.startsWith('barloop:')) data[key] = localStorage.getItem(key) || '';
     }
-    downloadJson({ version: 1, exportedAt: new Date().toISOString(), data });
+    downloadJson({ version: 2, appVersion: '1.1.0', exportedAt: new Date().toISOString(), data });
   };
 
   const importAll = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -96,13 +137,14 @@ export default function AppUtilities() {
         <section className="utility-sheet">
           <header><div><span className="eyebrow">APP & DATA</span><h2>백업과 기기 진단</h2></div><button type="button" onClick={() => setOpen(false)}>닫기</button></header>
           <div className="utility-actions">
+            {updateWorker && <button type="button" className="primary-button" onClick={() => updateWorker.postMessage({ type: 'SKIP_WAITING' })}>새 버전으로 업데이트</button>}
             <button type="button" onClick={exportAll}>전체 백업 내보내기</button>
             <button type="button" onClick={() => importRef.current?.click()}>백업 복원</button>
             <input ref={importRef} hidden type="file" accept="application/json,.json" onChange={importAll} />
             {installPrompt && <button type="button" className="primary-button" onClick={async () => { await installPrompt.prompt(); await installPrompt.userChoice; setInstallPrompt(null); }}>홈 화면에 설치</button>}
-            {saved.includes('복원 완료') && <button type="button" onClick={() => location.reload()}>지금 새로고침</button>}
+            {saved.includes('복원 완료') && <button type="button" onClick={() => window.location.reload()}>지금 새로고침</button>}
           </div>
-          <p className="utility-note">백업에는 미디어 파일이 포함되지 않으며, BarLoop 설정·구간·연습 기록만 저장됩니다.</p>
+          <p className="utility-note">BarLoop v1.1.0 · 백업에는 미디어 파일이 포함되지 않으며 설정·구간·연습 기록만 저장됩니다.</p>
           <div className="diagnostic-grid">
             <div><span>Web Audio</span><strong>{diagnostics.webAudio ? '지원' : '미지원'}</strong></div>
             <div><span>화면 꺼짐 방지</span><strong>{diagnostics.wakeLock ? '지원' : '미지원'}</strong></div>

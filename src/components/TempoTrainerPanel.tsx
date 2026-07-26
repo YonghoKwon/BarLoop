@@ -1,3 +1,5 @@
+import BpmNumberInput from './BpmNumberInput';
+
 export interface TempoTrainerSettings {
   enabled: boolean;
   startBpm: number;
@@ -47,22 +49,18 @@ export default function TempoTrainerPanel({
       <div className="compact-grid three">
         <label>
           시작 BPM
-          <input
-            type="number"
-            min={20}
-            max={400}
+          <BpmNumberInput
             value={settings.startBpm}
-            onChange={(event) => update('startBpm', Number(event.target.value))}
+            onChange={(value) => update('startBpm', value)}
+            ariaLabel="템포 트레이너 시작 BPM"
           />
         </label>
         <label>
           목표 BPM
-          <input
-            type="number"
-            min={20}
-            max={400}
+          <BpmNumberInput
             value={settings.targetBpm}
-            onChange={(event) => update('targetBpm', Number(event.target.value))}
+            onChange={(value) => update('targetBpm', value)}
+            ariaLabel="템포 트레이너 목표 BPM"
           />
         </label>
         <label>

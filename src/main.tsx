@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import AdvancedApp from './AdvancedApp';
 import './styles.css';
 import './advanced.css';
+import './metronome-lab.css';
+import './media-practice.css';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

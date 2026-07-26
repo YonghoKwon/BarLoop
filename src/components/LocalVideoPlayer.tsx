@@ -4,10 +4,11 @@ import type { PlayerCallbacks, PlayerHandle } from '../types';
 interface LocalVideoPlayerProps extends PlayerCallbacks {
   src: string;
   playbackRate: number;
+  volume?: number;
 }
 
 const LocalVideoPlayer = forwardRef<PlayerHandle, LocalVideoPlayerProps>(
-  ({ src, playbackRate, onReady, onPlayingChange, onError }, ref) => {
+  ({ src, playbackRate, volume = 0.85, onReady, onPlayingChange, onError }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useImperativeHandle(
@@ -23,13 +24,18 @@ const LocalVideoPlayer = forwardRef<PlayerHandle, LocalVideoPlayerProps>(
         setPlaybackRate: (rate) => {
           if (videoRef.current) videoRef.current.playbackRate = rate;
         },
+        setVolume: (nextVolume) => {
+          if (videoRef.current) videoRef.current.volume = Math.min(1, Math.max(0, nextVolume));
+        },
       }),
       [],
     );
 
     useEffect(() => {
-      if (videoRef.current) videoRef.current.playbackRate = playbackRate;
-    }, [playbackRate]);
+      if (!videoRef.current) return;
+      videoRef.current.playbackRate = playbackRate;
+      videoRef.current.volume = Math.min(1, Math.max(0, volume));
+    }, [playbackRate, volume]);
 
     return (
       <video
@@ -46,6 +52,7 @@ const LocalVideoPlayer = forwardRef<PlayerHandle, LocalVideoPlayerProps>(
         }}
         onLoadedMetadata={(event) => {
           event.currentTarget.playbackRate = playbackRate;
+          event.currentTarget.volume = Math.min(1, Math.max(0, volume));
           onReady(event.currentTarget.duration);
         }}
         onPlay={() => onPlayingChange(true)}

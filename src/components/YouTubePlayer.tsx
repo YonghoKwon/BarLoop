@@ -4,6 +4,7 @@ import type { PlayerCallbacks, PlayerHandle } from '../types';
 interface YouTubePlayerProps extends PlayerCallbacks {
   videoId: string;
   playbackRate: number;
+  volume?: number;
 }
 
 interface YouTubePlayerInstance {
@@ -14,6 +15,7 @@ interface YouTubePlayerInstance {
   getCurrentTime: () => number;
   getDuration: () => number;
   setPlaybackRate: (rate: number) => void;
+  setVolume: (volume: number) => void;
 }
 
 interface YouTubeApi {
@@ -74,15 +76,21 @@ function loadYouTubeApi(): Promise<YouTubeApi> {
 }
 
 const YouTubePlayer = forwardRef<PlayerHandle, YouTubePlayerProps>(
-  ({ videoId, playbackRate, onReady, onPlayingChange, onError }, ref) => {
+  ({ videoId, playbackRate, volume = 0.85, onReady, onPlayingChange, onError }, ref) => {
     const mountRef = useRef<HTMLDivElement>(null);
     const playerRef = useRef<YouTubePlayerInstance | null>(null);
     const playbackRateRef = useRef(playbackRate);
+    const volumeRef = useRef(volume);
 
     useEffect(() => {
       playbackRateRef.current = playbackRate;
       playerRef.current?.setPlaybackRate(playbackRate);
     }, [playbackRate]);
+
+    useEffect(() => {
+      volumeRef.current = volume;
+      playerRef.current?.setVolume(Math.round(Math.min(1, Math.max(0, volume)) * 100));
+    }, [volume]);
 
     useImperativeHandle(
       ref,
@@ -93,6 +101,7 @@ const YouTubePlayer = forwardRef<PlayerHandle, YouTubePlayerProps>(
         getCurrentTime: () => playerRef.current?.getCurrentTime() ?? 0,
         getDuration: () => playerRef.current?.getDuration() ?? 0,
         setPlaybackRate: (rate) => playerRef.current?.setPlaybackRate(rate),
+        setVolume: (nextVolume) => playerRef.current?.setVolume(Math.round(Math.min(1, Math.max(0, nextVolume)) * 100)),
       }),
       [],
     );
@@ -117,6 +126,7 @@ const YouTubePlayer = forwardRef<PlayerHandle, YouTubePlayerProps>(
             events: {
               onReady: () => {
                 playerRef.current?.setPlaybackRate(playbackRateRef.current);
+                playerRef.current?.setVolume(Math.round(Math.min(1, Math.max(0, volumeRef.current)) * 100));
                 onReady(playerRef.current?.getDuration() ?? 0);
               },
               onStateChange: ({ data }) => {
