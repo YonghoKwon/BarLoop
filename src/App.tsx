@@ -201,6 +201,7 @@ function App() {
   const [gapPlayBars, setGapPlayBars] = useState(initialSettingsRef.current.gapPlayBars);
   const [gapMuteBars, setGapMuteBars] = useState(initialSettingsRef.current.gapMuteBars);
   const [beatInBar, setBeatInBar] = useState(0);
+  const [subdivisionInBeat, setSubdivisionInBeat] = useState(0);
   const [audibleBeat, setAudibleBeat] = useState(true);
   const [countInRemaining, setCountInRemaining] = useState<number | null>(null);
 
@@ -461,6 +462,7 @@ function App() {
           onBeat: (remaining, beat) => {
             setCountInRemaining(remaining);
             setBeatInBar(beat);
+            setSubdivisionInBeat(0);
             setAudibleBeat(true);
           },
         });
@@ -495,8 +497,9 @@ function App() {
     void metronomeRef.current.start(
       () => playerRef.current?.getCurrentTime() ?? 0,
       metronomeSettings,
-      (beat, audible) => {
+      (beat, nextSubdivisionInBeat, audible) => {
         setBeatInBar(beat);
+        setSubdivisionInBeat(nextSubdivisionInBeat);
         setAudibleBeat(audible);
       },
     ).catch(() => setError('메트로놈 오디오를 시작할 수 없습니다.'));
@@ -908,7 +911,7 @@ function App() {
 
         <div className="tools-grid">
           <MediaPracticePanel mediaVolume={mediaVolume} onMediaVolumeChange={setMediaVolume} preRollBeats={preRollBeats} onPreRollBeatsChange={setPreRollBeats} beatsPerBar={beatsPerBar} bpm={Number.isFinite(bpm) ? bpm : 120} disabled={!isReady} canUseBars={bars.length >= 4} onPlayPreRoll={() => void playFromPreRoll()} onFillPreset={applyFillPreset} />
-          <MetronomePanel enabled={metronomeEnabled} onEnabledChange={setMetronomeEnabled} countInBars={countInBars} onCountInBarsChange={setCountInBars} subdivision={subdivision} onSubdivisionChange={setSubdivision} volume={metronomeVolume} onVolumeChange={setMetronomeVolume} gapEnabled={gapEnabled} onGapEnabledChange={setGapEnabled} gapPlayBars={gapPlayBars} gapMuteBars={gapMuteBars} onGapPlayBarsChange={(value) => setGapPlayBars(clamp(Math.round(value), 1, 16))} onGapMuteBarsChange={(value) => setGapMuteBars(clamp(Math.round(value), 1, 16))} beatInBar={beatInBar} beatsPerBar={beatsPerBar} audibleBeat={audibleBeat} countInRemaining={countInRemaining} />
+          <MetronomePanel enabled={metronomeEnabled} onEnabledChange={setMetronomeEnabled} countInBars={countInBars} onCountInBarsChange={setCountInBars} subdivision={subdivision} onSubdivisionChange={setSubdivision} volume={metronomeVolume} onVolumeChange={setMetronomeVolume} gapEnabled={gapEnabled} onGapEnabledChange={setGapEnabled} gapPlayBars={gapPlayBars} gapMuteBars={gapMuteBars} onGapPlayBarsChange={(value) => setGapPlayBars(clamp(Math.round(value), 1, 16))} onGapMuteBarsChange={(value) => setGapMuteBars(clamp(Math.round(value), 1, 16))} beatInBar={beatInBar} subdivisionInBeat={subdivisionInBeat} beatsPerBar={beatsPerBar} audibleBeat={audibleBeat} countInRemaining={countInRemaining} />
           <TempoTrainerPanel settings={trainerSettings} currentBpm={trainerCurrentBpm} baseBpm={Number.isFinite(bpm) ? bpm : 120} active={trainerActive} onChange={setTrainerSettings} onStart={startTrainer} onStop={stopTrainer} />
           <SectionPresetPanel mediaKey={mediaKey} sections={sections} currentStart={activeLoop.start} currentEnd={activeLoop.end} bpm={Number.isFinite(bpm) ? bpm : 120} playbackRate={playbackRate} disabled={!isReady} onSectionsChange={setSections} onLoad={loadSection} onNotice={(message) => { setNotice(message); setError(''); }} onError={(message) => { setError(message); setNotice(''); }} />
           <MidiControlPanel supported={midi.supported} enabled={midi.enabled} connectedInputs={midi.connectedInputs} lastNote={midi.lastNote} error={midi.error} mappings={midiMappings} onMappingsChange={setMidiMappings} onEnable={() => void midi.enable()} onDisable={midi.disable} />
@@ -920,7 +923,7 @@ function App() {
 
       <footer><p>로컬 파일과 연습 데이터는 서버로 전송되지 않습니다. 브라우저 호환 코덱과 기기 성능에 따라 동작이 달라질 수 있습니다.</p></footer>
 
-      <PracticeModeOverlay visible={practiceMode} isPlaying={isPlaying} bpm={Number.isFinite(bpm) ? bpm : 120} playbackRate={playbackRate} currentTime={currentTime} loopStart={activeLoop.start} loopEnd={activeLoop.end} loopCount={loopCount} currentBeat={beatInBar} beatsPerBar={beatsPerBar} metronomeEnabled={metronomeEnabled} wakeLockActive={wakeLock.active} onClose={() => void closePracticeMode()} onTogglePlayback={() => void togglePlayback()} onPrevious={() => moveBarSelection(-1)} onRestart={restartLoop} onNext={() => moveBarSelection(1)} onToggleWakeLock={() => { if (wakeLock.active) void wakeLock.release(); else void wakeLock.request(); }} />
+      <PracticeModeOverlay visible={practiceMode} isPlaying={isPlaying} bpm={Number.isFinite(bpm) ? bpm : 120} playbackRate={playbackRate} currentTime={currentTime} loopStart={activeLoop.start} loopEnd={activeLoop.end} loopCount={loopCount} currentBeat={beatInBar} subdivisionInBeat={subdivisionInBeat} subdivision={subdivision} beatsPerBar={beatsPerBar} metronomeEnabled={metronomeEnabled} audibleBeat={audibleBeat} countInRemaining={countInRemaining} wakeLockActive={wakeLock.active} onClose={() => void closePracticeMode()} onTogglePlayback={() => void togglePlayback()} onPrevious={() => moveBarSelection(-1)} onRestart={restartLoop} onNext={() => moveBarSelection(1)} onToggleWakeLock={() => { if (wakeLock.active) void wakeLock.release(); else void wakeLock.request(); }} />
     </div>
   );
 }

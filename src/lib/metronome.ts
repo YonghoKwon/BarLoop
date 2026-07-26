@@ -36,7 +36,7 @@ export class MetronomeEngine {
   private lastMediaTime = 0;
   private getMediaTime: (() => number) | null = null;
   private settings: MetronomeSettings | null = null;
-  private onBeat: ((beatInBar: number, audible: boolean) => void) | null = null;
+  private onBeat: ((beatInBar: number, subdivisionInBeat: number, audible: boolean) => void) | null = null;
 
   private async ensureContext(): Promise<AudioContext> {
     if (!this.context) {
@@ -55,7 +55,7 @@ export class MetronomeEngine {
   async start(
     getMediaTime: () => number,
     settings: MetronomeSettings,
-    onBeat?: (beatInBar: number, audible: boolean) => void,
+    onBeat?: (beatInBar: number, subdivisionInBeat: number, audible: boolean) => void,
   ): Promise<void> {
     await this.ensureContext();
     this.stopContinuous();
@@ -162,7 +162,7 @@ export class MetronomeEngine {
         const secondary = subdivisionInBeat !== 0;
         this.scheduleClick(when, accent, settings.volume, secondary);
       }
-      if (subdivisionInBeat === 0) this.onBeat?.(beatInBar, shouldSound);
+      this.onBeat?.(beatInBar, subdivisionInBeat, shouldSound);
       this.nextSubdivisionIndex += 1;
     }
 

@@ -224,3 +224,31 @@ footer { padding: 28px 0 34px; color: var(--text-muted); text-align: center; fon
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* Shared 1 e & a guide for media practice, metronome and count-in. */
+.shared-subdivision-guide { width: min(100%, 980px); display: flex; justify-content: center; gap: 8px; margin: 14px auto; padding: 8px; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; border-radius: 14px; background: rgba(7, 9, 14, .78); }
+.shared-count-beat { flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, minmax(31px, 1fr)); gap: 4px; padding: 5px; border: 1px solid #2e3545; border-radius: 11px; background: #11151e; }
+.shared-count-beat:has(> span:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(42px, 1fr)); }
+.shared-count-beat.active-beat { border-color: rgba(255, 106, 61, .72); background: rgba(255, 106, 61, .09); }
+.shared-count-beat span { min-height: 46px; display: grid; grid-template-rows: 1fr 8px; place-items: center; gap: 3px; padding: 5px; border-radius: 8px; color: #8e98aa; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; transition: transform .08s ease, background .08s ease, color .08s ease; }
+.shared-count-beat span strong { font-size: .9rem; }
+.shared-count-beat span i { width: 7px; height: 7px; border: 1px solid #596274; border-radius: 50%; }
+.shared-count-beat span.sound-on { color: #e6e9f0; }
+.shared-count-beat span.sound-on i { border: 0; background: var(--accent); }
+.shared-count-beat span.guide-only { opacity: .58; }
+.shared-count-beat span.active { transform: scale(1.08); background: var(--accent); color: white; box-shadow: 0 0 20px rgba(255,106,61,.28); opacity: 1; }
+.shared-count-beat span.active i { background: white; border-color: white; }
+.shared-count-beat span.active.muted { background: #394151; color: #aab2bf; box-shadow: none; }
+.shared-subdivision-guide.compact { justify-content: flex-start; width: 100%; margin-block: 14px; }
+.shared-subdivision-guide.compact .shared-count-beat span { min-height: 40px; }
+.metronome-count-readout { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin-top: 15px; }
+.metronome-count-readout strong { font-size: clamp(2.4rem, 8vw, 4.8rem); line-height: 1; }
+.metronome-count-readout span { color: var(--text-muted); font-size: .72rem; font-weight: 900; letter-spacing: .14em; }
+.practice-current-count { font-size: clamp(3rem, 11vw, 8rem) !important; white-space: nowrap; }
+.practice-subdivision-guide { width: min(100%, 1100px); margin-block: 4px; background: rgba(5, 7, 10, .9); }
+.practice-subdivision-guide .shared-count-beat { flex: 1 0 auto; }
+.practice-subdivision-guide .shared-count-beat span { min-width: 38px; min-height: clamp(46px, 8vh, 68px); }
+.practice-subdivision-guide .shared-count-beat span strong { font-size: clamp(.85rem, 2vw, 1.25rem); }
+@media (max-width: 760px) { .shared-subdivision-guide { justify-content: flex-start; } .shared-count-beat span { min-width: 29px; padding-inline: 3px; } .practice-subdivision-guide { margin-block: 0; } }
+@media (orientation: landscape) and (max-height: 520px) { .practice-subdivision-guide { max-height: 68px; padding-block: 4px; } .practice-subdivision-guide .shared-count-beat span { min-height: 48px; } }
