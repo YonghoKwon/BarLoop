@@ -7,6 +7,12 @@ on:
     paths:
       - scripts/apply_video_practice_ux.py
       - .github/workflows/apply-video-practice-ux.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - scripts/apply_video_practice_ux.py
+      - .github/workflows/apply-video-practice-ux.yml
   workflow_dispatch:
 
 permissions:
@@ -18,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/video-practice-ux-training-controls
+          ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -34,6 +40,5 @@ jobs:
             echo "No generated changes"
           else
             git commit -m "Improve video practice and training controls"
-            git push origin HEAD:agent/video-practice-ux-training-controls
+            git push origin HEAD:${{ github.head_ref || github.ref_name }}
           fi
-# trigger: 2026-07-27
