@@ -1,0 +1,315 @@
+/* Variable-meter metronome and drum-training layouts. */
+.meter-stage-status,
+.training-meter-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  border: 1px solid #394156;
+  border-radius: 999px;
+  background: rgba(12, 15, 23, .82);
+}
+.meter-stage-status strong,
+.training-meter-status strong { color: #fff; font-size: 1rem; }
+.meter-stage-status span,
+.training-meter-status span { color: #9fa9bc; font-size: .72rem; }
+
+.meter-progress-readout,
+.training-beat-readout {
+  margin: 3px 0 9px;
+  color: #aeb8ca;
+  font-size: .8rem;
+}
+.meter-progress-readout strong,
+.training-beat-readout strong { color: #fff; font-size: 1.08rem; }
+
+.meter-group-overview {
+  width: min(100%, 690px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 auto 8px;
+}
+.meter-overview-group {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid #303849;
+  border-radius: 11px;
+  background: #11151e;
+}
+.meter-overview-group > b {
+  color: #8f99ac;
+  font-size: .6rem;
+  font-weight: 700;
+}
+.meter-overview-group > div { display: flex; gap: 4px; }
+.meter-overview-group i {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #343d4e;
+  border-radius: 8px;
+  background: #191f2b;
+  color: #8c96aa;
+  font-style: normal;
+  font-weight: 800;
+}
+.meter-overview-group i.active {
+  border-color: #8f80ff;
+  background: #8f80ff;
+  color: #fff;
+  box-shadow: 0 0 16px rgba(143,128,255,.42);
+}
+
+.subdivision-count-guide.variable-meter-guide {
+  width: min(100%, 760px);
+  display: grid;
+  grid-template-columns: repeat(var(--meter-columns, 4), minmax(0, 1fr));
+  gap: 7px;
+  overflow: visible;
+}
+.variable-meter-guide .count-beat-group {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 6px;
+}
+.variable-meter-guide .count-beat-group > b {
+  display: block;
+  color: #8791a5;
+  font-size: .62rem;
+  text-align: left;
+}
+.variable-meter-guide .count-beat-group > section {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+}
+.variable-meter-guide .count-beat-group span {
+  min-width: 0;
+  min-height: 36px;
+  padding-inline: 2px;
+  font-size: .75rem;
+}
+.variable-meter-guide .count-beat-group span.offbeat-guide:not(.active) {
+  background: rgba(48, 61, 82, .34);
+}
+.variable-meter-guide .count-beat-group span.downbeat-guide {
+  box-shadow: inset 2px 0 0 rgba(143,128,255,.5);
+}
+.variable-accent-sequencer {
+  grid-template-columns: repeat(var(--meter-columns, 4), minmax(0, 1fr));
+}
+.meter-grouping-hint {
+  margin: 12px 0 0;
+  color: #98a3b7;
+  font-size: .75rem;
+  line-height: 1.45;
+}
+.meter-grouping-hint strong { color: #d8deeb; }
+
+.training-measure-guide {
+  width: min(100%, 720px);
+  grid-template-columns: repeat(var(--measure-columns, 4), minmax(0, 1fr));
+  align-items: stretch;
+}
+.training-measure-guide > div {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  padding: 5px;
+}
+.training-measure-guide > div > b {
+  color: #8e98ab;
+  font-size: .6rem;
+  text-align: left;
+}
+.training-measure-guide > div > section {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+}
+.training-measure-guide span.offbeat:not(.active) {
+  background: rgba(60, 75, 99, .25);
+  color: #8793a8;
+}
+.training-measure-guide span.downbeat {
+  box-shadow: inset 2px 0 0 rgba(255,106,61,.48);
+}
+
+.training-settings-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.sequence-heading-actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+.sequence-heading-actions label {
+  min-width: 180px;
+  display: grid;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: .7rem;
+}
+.sequence-heading-actions select { width: 100%; }
+
+.sequencer-meter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 11px;
+  padding: 9px 11px;
+  border: 1px solid #343d4e;
+  border-radius: 11px;
+  background: #111620;
+}
+.sequencer-meter-summary strong {
+  margin-right: 3px;
+  color: #fff;
+  font-size: 1.05rem;
+}
+.sequencer-meter-summary span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #202736;
+  color: #aeb8ca;
+  font-size: .67rem;
+}
+
+.syncopation-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid rgba(84, 155, 255, .32);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(75,145,255,.09), rgba(14,18,28,.9));
+}
+.syncopation-actions > div { min-width: 0; }
+.syncopation-actions strong,
+.syncopation-actions span { display: block; }
+.syncopation-actions span {
+  margin-top: 3px;
+  color: #9da8bb;
+  font-size: .7rem;
+  line-height: 1.4;
+}
+.syncopation-actions button {
+  min-height: 42px;
+  padding: 0 12px;
+  border-color: rgba(75,145,255,.55);
+  background: rgba(75,145,255,.12);
+}
+.legend-dot.offbeat {
+  border: 1px dashed #6e7b92;
+  background: rgba(75,145,255,.12);
+}
+
+.drum-sequence-row {
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(54,63,79,.45);
+}
+.drum-sequence-row:last-child { border-bottom: 0; }
+.instrument-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+.drum-beat-groups {
+  grid-template-columns: repeat(var(--beat-columns, 4), minmax(0, 1fr));
+}
+.drum-beat-group:nth-child(4n+1):not(:first-child) {
+  border-left-color: rgba(255,106,61,.65);
+}
+.drum-substep-labels span.offbeat-label { color: #97a7c0; }
+.drum-substep-grid button.offbeat-cell:not(.on):not(.accent) {
+  background: #161e2a;
+  border-style: dashed;
+  border-color: #35445a;
+}
+.drum-substep-grid button.ampersand-cell:not(.on):not(.accent) {
+  background: rgba(75,145,255,.1);
+}
+.drum-substep-grid button.downbeat-cell {
+  box-shadow: inset 2px 0 0 rgba(255,255,255,.12);
+}
+
+.moving-accent-readout { flex-wrap: wrap; }
+.moving-accent-readout small {
+  width: 100%;
+  color: #8290a5;
+  font-size: .62rem;
+  text-align: right;
+}
+.accent-position-strip {
+  grid-template-columns: repeat(var(--accent-columns, 16), minmax(0, 1fr));
+}
+.accent-position-strip i.offbeat-position:not(.active) {
+  border-style: dashed;
+  background: rgba(75,145,255,.06);
+}
+.accent-position-strip i.downbeat-position {
+  box-shadow: inset 2px 0 0 rgba(255,106,61,.38);
+}
+
+@media (max-width: 1120px) {
+  .training-settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .syncopation-actions { grid-template-columns: 1fr 1fr; }
+  .syncopation-actions > div { grid-column: 1 / -1; }
+}
+
+@media (max-width: 760px) {
+  .subdivision-count-guide.variable-meter-guide,
+  .variable-accent-sequencer {
+    --meter-columns: 2 !important;
+  }
+  .meter-group-overview { gap: 5px; }
+  .meter-overview-group { padding: 5px; }
+  .meter-overview-group i { width: 29px; height: 29px; }
+
+  .training-measure-guide { --measure-columns: 2 !important; }
+  .training-settings-grid { grid-template-columns: 1fr; }
+  .sequence-heading-actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
+  .sequence-heading-actions label { min-width: 0; }
+  .drum-beat-groups { --beat-columns: 2 !important; }
+  .syncopation-actions { grid-template-columns: 1fr; }
+  .syncopation-actions > div { grid-column: auto; }
+  .accent-position-strip { --accent-columns: 8 !important; }
+}
+
+@media (max-width: 430px) {
+  .subdivision-count-guide.variable-meter-guide {
+    gap: 4px;
+    padding: 5px;
+  }
+  .variable-meter-guide .count-beat-group { padding: 4px; }
+  .variable-meter-guide .count-beat-group span {
+    min-height: 32px;
+    font-size: .66rem;
+  }
+  .meter-overview-group i { width: 27px; height: 27px; font-size: .72rem; }
+  .sequence-heading-actions { grid-template-columns: 1fr; }
+  .sequence-heading-actions button { width: 100%; }
+  .drum-sequence-row { grid-template-columns: 40px minmax(0, 1fr); }
+  .drum-beat-group { padding: 4px; }
+  .drum-substep-grid button { min-height: 36px; }
+  .accent-position-strip { gap: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meter-overview-group i.active { box-shadow: none; }
+}
