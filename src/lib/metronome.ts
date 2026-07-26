@@ -1,4 +1,12 @@
+import {
+  METRONOME_AUDIO_RESUME_EVENT,
+  METRONOME_AUDIO_STATE_EVENT,
+  type MetronomeAudioState,
+} from './standaloneMetronome';
+
 export type Subdivision = 1 | 2 | 3 | 4;
+export type MediaCountMode = 'click' | 'voice' | 'both';
+export type CountInClickMode = 'beat' | 'subdivision';
 
 export interface MetronomeSettings {
   bpm: number;
@@ -7,6 +15,8 @@ export interface MetronomeSettings {
   volume: number;
   playbackRate: number;
   firstDownbeat: number;
+  syncOffsetMs: number;
+  clickEnabled: boolean;
   gapEnabled: boolean;
   gapPlayBars: number;
   gapMuteBars: number;
@@ -17,7 +27,15 @@ interface CountInSettings {
   beatsPerBar: number;
   bars: number;
   volume: number;
-  onBeat: (remainingBeats: number, beatInBar: number) => void;
+  subdivision: Subdivision;
+  clickMode: CountInClickMode;
+  clickEnabled: boolean;
+  onStep: (
+    remainingBeats: number,
+    beatInBar: number,
+    subdivisionInBeat: number,
+    audible: boolean,
+  ) => void;
 }
 
 type AudioContextConstructor = typeof AudioContext;
@@ -27,43 +45,73 @@ function getAudioContextConstructor(): AudioContextConstructor | null {
   return window.AudioContext ?? scope.webkitAudioContext ?? null;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 export class MetronomeEngine {
   private context: AudioContext | null = null;
   private timerId = 0;
-  private countInTimers: number[] = [];
+  private countInTimers = new Set<number>();
+  private positionTimers = new Set<number>();
+  private scheduledSources = new Set<OscillatorNode>();
   private running = false;
+  private countInActive = false;
   private nextSubdivisionIndex = 0;
   private lastMediaTime = 0;
   private getMediaTime: (() => number) | null = null;
   private settings: MetronomeSettings | null = null;
-  private onBeat: ((beatInBar: number, subdivisionInBeat: number, audible: boolean) => void) | null = null;
+  private onPosition: ((beatInBar: number, subdivisionInBeat: number, audible: boolean) => void) | null = null;
+  private lifecycleAttached = false;
+
+  private notifyAudioState(state: MetronomeAudioState): void {
+    window.dispatchEvent(
+      new CustomEvent<{ state: MetronomeAudioState }>(METRONOME_AUDIO_STATE_EVENT, {
+        detail: { state },
+      }),
+    );
+  }
+
+  private hasActiveAudio(): boolean {
+    return this.running || this.countInActive;
+  }
 
   private async ensureContext(): Promise<AudioContext> {
-    if (!this.context) {
+    if (!this.context || this.context.state === 'closed') {
       const Constructor = getAudioContextConstructor();
       if (!Constructor) throw new Error('이 브라우저는 Web Audio를 지원하지 않습니다.');
       this.context = new Constructor({ latencyHint: 'interactive' });
+      this.context.addEventListener('statechange', this.handleContextStateChange);
     }
-    if (this.context.state === 'suspended') await this.context.resume();
+
+    if (this.context.state !== 'running') await this.context.resume();
+    if (this.context.state !== 'running') {
+      throw new Error('브라우저가 오디오를 일시 중단했습니다. 화면을 탭해 소리를 다시 켜 주세요.');
+    }
     return this.context;
   }
 
   async unlock(): Promise<void> {
+    this.attachLifecycleListeners();
+    this.notifyAudioState('starting');
     await this.ensureContext();
+    this.notifyAudioState('running');
   }
 
   async start(
     getMediaTime: () => number,
     settings: MetronomeSettings,
-    onBeat?: (beatInBar: number, subdivisionInBeat: number, audible: boolean) => void,
+    onPosition?: (beatInBar: number, subdivisionInBeat: number, audible: boolean) => void,
   ): Promise<void> {
     await this.ensureContext();
     this.stopContinuous();
     this.running = true;
     this.getMediaTime = getMediaTime;
     this.settings = settings;
-    this.onBeat = onBeat ?? null;
+    this.onPosition = onPosition ?? null;
+    this.attachLifecycleListeners();
     this.resync();
+    this.notifyAudioState('running');
     this.schedule();
   }
 
@@ -76,10 +124,9 @@ export class MetronomeEngine {
     if (!this.getMediaTime || !this.settings) return;
     const mediaTime = this.getMediaTime();
     const subdivisionDuration = 60 / this.settings.bpm / this.settings.subdivision;
-    this.nextSubdivisionIndex = Math.max(
-      0,
-      Math.floor((mediaTime - this.settings.firstDownbeat) / subdivisionDuration) + 1,
-    );
+    const adjustedMediaTime =
+      mediaTime - this.settings.firstDownbeat - clamp(this.settings.syncOffsetMs, -500, 500) / 1000;
+    this.nextSubdivisionIndex = Math.max(0, Math.floor(adjustedMediaTime / subdivisionDuration) + 1);
     this.lastMediaTime = mediaTime;
   }
 
@@ -87,54 +134,131 @@ export class MetronomeEngine {
     this.running = false;
     window.clearTimeout(this.timerId);
     this.timerId = 0;
+    this.clearPositionTimers();
+    this.clearScheduledSources();
   }
 
   stopAll(): void {
     this.stopContinuous();
     this.cancelCountIn();
+    this.getMediaTime = null;
+    this.settings = null;
+    this.onPosition = null;
+    this.detachLifecycleListeners();
+    this.notifyAudioState('idle');
   }
 
   cancelCountIn(): void {
     this.countInTimers.forEach((timer) => window.clearTimeout(timer));
-    this.countInTimers = [];
+    this.countInTimers.clear();
+    this.countInActive = false;
+    this.clearScheduledSources();
+    if (!this.running) this.notifyAudioState('idle');
   }
 
   async countIn(settings: CountInSettings): Promise<void> {
     this.cancelCountIn();
+    this.attachLifecycleListeners();
+    this.countInActive = true;
+    this.notifyAudioState('starting');
     const context = await this.ensureContext();
+    this.notifyAudioState('running');
+
+    const safeSubdivision = Math.max(1, settings.subdivision);
     const totalBeats = Math.max(0, Math.round(settings.beatsPerBar * settings.bars));
-    if (totalBeats === 0) return;
+    const totalSteps = totalBeats * safeSubdivision;
+    if (totalSteps === 0) {
+      this.countInActive = false;
+      return;
+    }
 
-    const interval = 60 / settings.bpm;
-    const startAt = context.currentTime + 0.06;
+    const interval = 60 / clamp(settings.bpm, 20, 800) / safeSubdivision;
+    const startAt = context.currentTime + 0.07;
 
-    for (let index = 0; index < totalBeats; index += 1) {
-      const beatInBar = index % settings.beatsPerBar;
-      this.scheduleClick(startAt + index * interval, beatInBar === 0, settings.volume);
-      const timer = window.setTimeout(
-        () => settings.onBeat(totalBeats - index - 1, beatInBar),
-        Math.max(0, (startAt - context.currentTime + index * interval) * 1000),
-      );
-      this.countInTimers.push(timer);
+    for (let index = 0; index < totalSteps; index += 1) {
+      const subdivisionInBeat = index % safeSubdivision;
+      const absoluteBeatIndex = Math.floor(index / safeSubdivision);
+      const beatInBar = absoluteBeatIndex % settings.beatsPerBar;
+      const clickThisStep = settings.clickMode === 'subdivision' || subdivisionInBeat === 0;
+
+      if (settings.clickEnabled && clickThisStep) {
+        this.scheduleClick(
+          startAt + index * interval,
+          subdivisionInBeat === 0 && beatInBar === 0,
+          subdivisionInBeat !== 0,
+          settings.volume,
+        );
+      }
+
+      const delay = Math.max(0, (startAt - context.currentTime + index * interval) * 1000);
+      const timer = window.setTimeout(() => {
+        this.countInTimers.delete(timer);
+        if (!this.countInActive) return;
+        const remainingSteps = totalSteps - index - 1;
+        settings.onStep(
+          Math.ceil(remainingSteps / safeSubdivision),
+          beatInBar,
+          subdivisionInBeat,
+          true,
+        );
+      }, delay);
+      this.countInTimers.add(timer);
     }
 
     await new Promise<void>((resolve) => {
-      const timer = window.setTimeout(resolve, (startAt - context.currentTime + totalBeats * interval) * 1000);
-      this.countInTimers.push(timer);
+      const timer = window.setTimeout(() => {
+        this.countInTimers.delete(timer);
+        resolve();
+      }, Math.max(0, (startAt - context.currentTime + totalSteps * interval) * 1000));
+      this.countInTimers.add(timer);
     });
-    this.countInTimers = [];
+
+    this.countInTimers.clear();
+    this.countInActive = false;
+    if (!this.running) this.notifyAudioState('idle');
   }
 
-  private schedule = () => {
+  async resumeAfterInterruption(playConfirmationClick = false): Promise<boolean> {
+    if (!this.hasActiveAudio()) return false;
+    try {
+      const context = await this.ensureContext();
+      if (this.running) {
+        this.resync();
+        window.clearTimeout(this.timerId);
+        this.schedule();
+      }
+      if (playConfirmationClick) {
+        this.scheduleClick(context.currentTime + 0.025, true, false, this.settings?.volume ?? 0.55);
+      }
+      this.notifyAudioState('running');
+      return true;
+    } catch {
+      this.notifyAudioState('suspended');
+      return false;
+    }
+  }
+
+  async testClick(): Promise<void> {
+    const context = await this.ensureContext();
+    this.scheduleClick(context.currentTime + 0.025, true, false, this.settings?.volume ?? 0.55);
+  }
+
+  private schedule = (): void => {
     if (!this.running || !this.context || !this.getMediaTime || !this.settings) return;
+
+    if (this.context.state !== 'running') {
+      const state = String(this.context.state) === 'interrupted' ? 'interrupted' : 'suspended';
+      this.notifyAudioState(state);
+      this.timerId = window.setTimeout(this.schedule, 250);
+      return;
+    }
 
     const settings = this.settings;
     const mediaTime = this.getMediaTime();
     const subdivisionDuration = 60 / settings.bpm / settings.subdivision;
-    const expectedIndex = Math.max(
-      0,
-      Math.floor((mediaTime - settings.firstDownbeat) / subdivisionDuration) + 1,
-    );
+    const adjustedMediaTime =
+      mediaTime - settings.firstDownbeat - clamp(settings.syncOffsetMs, -500, 500) / 1000;
+    const expectedIndex = Math.max(0, Math.floor(adjustedMediaTime / subdivisionDuration) + 1);
 
     if (
       mediaTime < this.lastMediaTime - 0.08 ||
@@ -144,30 +268,55 @@ export class MetronomeEngine {
     }
     this.lastMediaTime = mediaTime;
 
-    const horizonMediaTime = mediaTime + 0.13 * Math.max(0.1, settings.playbackRate);
-    while (true) {
+    const horizonMediaTime = mediaTime + 0.14 * Math.max(0.1, settings.playbackRate);
+    let scheduled = 0;
+    while (scheduled < 256) {
       const targetMediaTime =
-        settings.firstDownbeat + this.nextSubdivisionIndex * subdivisionDuration;
+        settings.firstDownbeat +
+        clamp(settings.syncOffsetMs, -500, 500) / 1000 +
+        this.nextSubdivisionIndex * subdivisionDuration;
       if (targetMediaTime > horizonMediaTime) break;
 
       const realDelay = (targetMediaTime - mediaTime) / Math.max(0.1, settings.playbackRate);
       const when = this.context.currentTime + Math.max(0.004, realDelay);
       const subdivisionInBeat = this.nextSubdivisionIndex % settings.subdivision;
       const quarterBeatIndex = Math.floor(this.nextSubdivisionIndex / settings.subdivision);
-      const beatInBar = ((quarterBeatIndex % settings.beatsPerBar) + settings.beatsPerBar) % settings.beatsPerBar;
+      const beatInBar =
+        ((quarterBeatIndex % settings.beatsPerBar) + settings.beatsPerBar) % settings.beatsPerBar;
       const shouldSound = this.shouldSound(quarterBeatIndex, settings);
 
-      if (shouldSound) {
-        const accent = subdivisionInBeat === 0 && beatInBar === 0;
-        const secondary = subdivisionInBeat !== 0;
-        this.scheduleClick(when, accent, settings.volume, secondary);
+      if (shouldSound && settings.clickEnabled) {
+        this.scheduleClick(
+          when,
+          subdivisionInBeat === 0 && beatInBar === 0,
+          subdivisionInBeat !== 0,
+          settings.volume,
+        );
       }
-      this.onBeat?.(beatInBar, subdivisionInBeat, shouldSound);
+      this.schedulePosition(when, beatInBar, subdivisionInBeat, shouldSound);
       this.nextSubdivisionIndex += 1;
+      scheduled += 1;
     }
 
-    this.timerId = window.setTimeout(this.schedule, 24);
+    this.timerId = window.setTimeout(this.schedule, 22);
   };
+
+  private schedulePosition(
+    when: number,
+    beatInBar: number,
+    subdivisionInBeat: number,
+    audible: boolean,
+  ): void {
+    const context = this.context;
+    if (!context) return;
+    const delay = Math.max(0, (when - context.currentTime) * 1000);
+    const timer = window.setTimeout(() => {
+      this.positionTimers.delete(timer);
+      if (!this.running) return;
+      this.onPosition?.(beatInBar, subdivisionInBeat, audible);
+    }, delay);
+    this.positionTimers.add(timer);
+  }
 
   private shouldSound(quarterBeatIndex: number, settings: MetronomeSettings): boolean {
     if (!settings.gapEnabled || settings.gapMuteBars <= 0) return true;
@@ -179,25 +328,109 @@ export class MetronomeEngine {
   private scheduleClick(
     when: number,
     accent: boolean,
+    secondary: boolean,
     volume: number,
-    secondary = false,
   ): void {
     const context = this.context;
-    if (!context) return;
+    if (!context || context.state !== 'running') return;
 
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(accent ? 1450 : secondary ? 760 : 1050, when);
 
-    const level = Math.max(0, Math.min(1, volume)) * (accent ? 0.9 : secondary ? 0.34 : 0.58);
+    const level = clamp(volume, 0, 1) * (accent ? 0.9 : secondary ? 0.34 : 0.58);
     gain.gain.setValueAtTime(0.0001, when);
     gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, level), when + 0.004);
     gain.gain.exponentialRampToValueAtTime(0.0001, when + (secondary ? 0.035 : 0.055));
 
     oscillator.connect(gain);
     gain.connect(context.destination);
+    this.scheduledSources.add(oscillator);
+    oscillator.addEventListener(
+      'ended',
+      () => {
+        this.scheduledSources.delete(oscillator);
+        oscillator.disconnect();
+        gain.disconnect();
+      },
+      { once: true },
+    );
     oscillator.start(when);
-    oscillator.stop(when + 0.07);
+    oscillator.stop(when + 0.075);
+  }
+
+  private clearPositionTimers(): void {
+    this.positionTimers.forEach((timer) => window.clearTimeout(timer));
+    this.positionTimers.clear();
+  }
+
+  private clearScheduledSources(): void {
+    this.scheduledSources.forEach((source) => {
+      try {
+        source.stop();
+      } catch {
+        // The source may already have stopped.
+      }
+    });
+    this.scheduledSources.clear();
+  }
+
+  private handleContextStateChange = (): void => {
+    const context = this.context;
+    if (!context || !this.hasActiveAudio()) return;
+    const state = String(context.state);
+    if (state === 'running') {
+      if (this.running) {
+        this.resync();
+        window.clearTimeout(this.timerId);
+        this.schedule();
+      }
+      this.notifyAudioState('running');
+      return;
+    }
+    this.notifyAudioState(
+      state === 'interrupted' ? 'interrupted' : state === 'closed' ? 'closed' : 'suspended',
+    );
+  };
+
+  private handleVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible' && this.hasActiveAudio()) {
+      void this.resumeAfterInterruption();
+    }
+  };
+
+  private handleWindowFocus = (): void => {
+    if (this.hasActiveAudio()) void this.resumeAfterInterruption();
+  };
+
+  private handlePointerDown = (): void => {
+    if (this.hasActiveAudio() && this.context?.state !== 'running') {
+      void this.resumeAfterInterruption(true);
+    }
+  };
+
+  private handleResumeRequest = (): void => {
+    if (this.hasActiveAudio()) void this.resumeAfterInterruption(true);
+  };
+
+  private attachLifecycleListeners(): void {
+    if (this.lifecycleAttached) return;
+    this.lifecycleAttached = true;
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    window.addEventListener('focus', this.handleWindowFocus);
+    window.addEventListener('pageshow', this.handleWindowFocus);
+    window.addEventListener('pointerdown', this.handlePointerDown, { passive: true });
+    window.addEventListener(METRONOME_AUDIO_RESUME_EVENT, this.handleResumeRequest);
+  }
+
+  private detachLifecycleListeners(): void {
+    if (!this.lifecycleAttached) return;
+    this.lifecycleAttached = false;
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    window.removeEventListener('focus', this.handleWindowFocus);
+    window.removeEventListener('pageshow', this.handleWindowFocus);
+    window.removeEventListener('pointerdown', this.handlePointerDown);
+    window.removeEventListener(METRONOME_AUDIO_RESUME_EVENT, this.handleResumeRequest);
   }
 }
