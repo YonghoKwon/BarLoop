@@ -1,0 +1,35 @@
+name: Fix PR 18 validation
+
+on:
+  push:
+    branches:
+      - agent/accent-flash-customization
+    paths:
+      - .github/pr18-validation-trigger.txt
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/accent-flash-customization
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/fix_pr18_validation.py
+      - run: |
+          rm -f scripts/fix_pr18_validation.py
+          rm -f .github/workflows/fix-pr18-validation.yml
+          rm -f .github/pr18-validation-trigger.txt
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix accent customization validation"
+          git push origin HEAD:agent/accent-flash-customization
