@@ -4,7 +4,7 @@ import type { PlayerCallbacks, PlayerHandle } from '../types';
 interface YouTubePlayerProps extends PlayerCallbacks {
   videoId: string;
   playbackRate: number;
-  volume: number;
+  volume?: number;
 }
 
 interface YouTubePlayerInstance {
@@ -76,7 +76,7 @@ function loadYouTubeApi(): Promise<YouTubeApi> {
 }
 
 const YouTubePlayer = forwardRef<PlayerHandle, YouTubePlayerProps>(
-  ({ videoId, playbackRate, volume, onReady, onPlayingChange, onError }, ref) => {
+  ({ videoId, playbackRate, volume = 0.85, onReady, onPlayingChange, onError }, ref) => {
     const mountRef = useRef<HTMLDivElement>(null);
     const playerRef = useRef<YouTubePlayerInstance | null>(null);
     const playbackRateRef = useRef(playbackRate);
