@@ -1,0 +1,38 @@
+name: Apply video practice UX patch
+
+on:
+  push:
+    branches:
+      - agent/video-practice-ux-training-controls
+    paths:
+      - scripts/apply_video_practice_ux.py
+      - .github/workflows/apply-video-practice-ux.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/video-practice-ux-training-controls
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply patch
+        run: python scripts/apply_video_practice_ux.py
+      - name: Commit generated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src e2e public/sw.js
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+          else
+            git commit -m "Improve video practice and training controls"
+            git push origin HEAD:agent/video-practice-ux-training-controls
+          fi
