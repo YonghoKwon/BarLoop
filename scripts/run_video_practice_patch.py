@@ -15,24 +15,25 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
 
 script = APPLY.read_text(encoding='utf-8')
 script = script.replace(
-    "const SETTINGS_KEY = 'barloop:practice-settings:v4';\\nconst METRONOME_SOUNDS",
-    "const SETTINGS_KEY = 'barloop:practice-settings:v4';\\nconst LEGACY_SETTINGS_KEY = 'barloop:practice-settings:v3';\\nconst METRONOME_SOUNDS",
+    "const SETTINGS_KEY = 'barloop:practice-settings:v4';\nconst METRONOME_SOUNDS",
+    "const SETTINGS_KEY = 'barloop:practice-settings:v4';\nconst LEGACY_SETTINGS_KEY = 'barloop:practice-settings:v3';\nconst METRONOME_SOUNDS",
 )
 script = script.replace(
     "const SETTINGS_KEY = 'barloop:practice-settings:v3';",
-    "const SETTINGS_KEY = 'barloop:practice-settings:v4';\\nconst LEGACY_SETTINGS_KEY = 'barloop:practice-settings:v3';",
+    "const SETTINGS_KEY = 'barloop:practice-settings:v4';\nconst LEGACY_SETTINGS_KEY = 'barloop:practice-settings:v3';",
 )
-current_before_clock = '''app = replace_once(app, "  const activeLoop = useMemo(() => {", "  const currentBarIndex = useMemo(() => {\\n    if (bars.length === 0) return -1;\\n    const found = bars.findIndex((bar) => currentTime >= bar.start && currentTime < bar.end);\\n    if (found >= 0) return found;\\n    return currentTime >= bars[bars.length - 1].end ? bars.length - 1 : -1;\\n  }, [bars, currentTime]);\\n\\n  const activeLoop = useMemo(() => {", 'App current bar')
+current_before_clock = '''app = replace_once(app, "  const activeLoop = useMemo(() => {", "  const currentBarIndex = useMemo(() => {\n    if (bars.length === 0) return -1;\n    const found = bars.findIndex((bar) => currentTime >= bar.start && currentTime < bar.end);\n    if (found >= 0) return found;\n    return currentTime >= bars[bars.length - 1].end ? bars.length - 1 : -1;\n  }, [bars, currentTime]);\n\n  const activeLoop = useMemo(() => {", 'App current bar')
 '''
 script = script.replace(current_before_clock, '# Current bar is inserted after usePlaybackClock.\n')
-current_after_clock = '''app = replace_once(app, "  const seekTo = useCallback((seconds: number) => {", "  const currentBarIndex = useMemo(() => {\\n    if (bars.length === 0) return -1;\\n    const found = bars.findIndex((bar) => currentTime >= bar.start && currentTime < bar.end);\\n    if (found >= 0) return found;\\n    return currentTime >= bars[bars.length - 1].end ? bars.length - 1 : -1;\\n  }, [bars, currentTime]);\\n\\n  const seekTo = useCallback((seconds: number) => {", 'App current bar after clock')\n'''
-marker = 'app = replace_once(app, "            <div className=\\"transport-row sticky-mobile-controls\\">"'
+current_after_clock = '''app = replace_once(app, "  const seekTo = useCallback((seconds: number) => {", "  const currentBarIndex = useMemo(() => {\n    if (bars.length === 0) return -1;\n    const found = bars.findIndex((bar) => currentTime >= bar.start && currentTime < bar.end);\n    if (found >= 0) return found;\n    return currentTime >= bars[bars.length - 1].end ? bars.length - 1 : -1;\n  }, [bars, currentTime]);\n\n  const seekTo = useCallback((seconds: number) => {", 'App current bar after clock')
+'''
+marker = 'app = replace_once(app, "            <div className=\"transport-row sticky-mobile-controls\">"'
 if current_after_clock not in script:
     index = script.index(marker)
     script = script[:index] + current_after_clock + script[index:]
 script = script.replace(
-    'page = replace_once(page, "      accentFlashEnabled,\\n    }));", "      accentFlashEnabled, kitSize, guideClickEnabled, guideSubdivision, clickVolume, accentVolume, subdivisionVolume, sound, accentSound,\\n    }));", \'training storage body\')',
-    '''page = replace_once(page, "      accentFlashEnabled,\\n      accentFlash,\\n    }));", "      accentFlashEnabled,\\n      accentFlash,\\n      kitSize,\\n      guideClickEnabled,\\n      guideSubdivision,\\n      clickVolume,\\n      accentVolume,\\n      subdivisionVolume,\\n      sound,\\n      accentSound,\\n    }));", 'training storage body')''',
+    'page = replace_once(page, "      accentFlashEnabled,\n    }));", "      accentFlashEnabled, kitSize, guideClickEnabled, guideSubdivision, clickVolume, accentVolume, subdivisionVolume, sound, accentSound,\n    }));", \'training storage body\')',
+    '''page = replace_once(page, "      accentFlashEnabled,\n      accentFlash,\n    }));", "      accentFlashEnabled,\n      accentFlash,\n      kitSize,\n      guideClickEnabled,\n      guideSubdivision,\n      clickVolume,\n      accentVolume,\n      subdivisionVolume,\n      sound,\n      accentSound,\n    }));", 'training storage body')''',
 )
 script = script.replace(
     'page = replace_once(page, "  }, [accentEveryBars, accentFlashEnabled,", "  }, [accentEveryBars, accentFlashEnabled, accentSound, accentVolume, clickVolume, guideClickEnabled, guideSubdivision, kitSize, sound, subdivisionVolume,", \'training storage deps\')',
@@ -102,3 +103,4 @@ standalone = replace_once(
 standalone_path.write_text(standalone, encoding='utf-8')
 
 print('Prepared final video practice and drummer training source.')
+# trigger validated generation
