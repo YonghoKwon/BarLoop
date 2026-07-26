@@ -40,7 +40,23 @@ jobs:
           node-version: 22
           cache: npm
       - name: Generate final source
-        run: python scripts/run_video_practice_patch.py
+        id: generate
+        run: |
+          set +e
+          python scripts/run_video_practice_patch.py > generation.log 2>&1
+          code=$?
+          cat generation.log
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload generation diagnostics
+        if: steps.generate.outputs.exit_code != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-practice-generation-failure
+          path: generation.log
+      - name: Stop after generation failure
+        if: steps.generate.outputs.exit_code != '0'
+        run: exit 1
       - name: Install dependencies
         run: npm install
       - name: Run unit tests
