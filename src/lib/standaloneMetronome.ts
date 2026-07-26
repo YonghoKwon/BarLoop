@@ -34,17 +34,6 @@ export interface MetronomeTick {
   audible: boolean;
 }
 
-interface WakeLockHandle {
-  release: () => Promise<void>;
-  addEventListener: (type: 'release', listener: () => void, options?: AddEventListenerOptions) => void;
-}
-
-interface WakeLockNavigator extends Navigator {
-  wakeLock?: {
-    request: (type: 'screen') => Promise<WakeLockHandle>;
-  };
-}
-
 type AudioContextConstructor = typeof AudioContext;
 
 function getAudioContextConstructor(): AudioContextConstructor | null {
@@ -80,7 +69,7 @@ export class StandaloneMetronomeEngine {
   private settings: StandaloneMetronomeSettings | null = null;
   private onTick: ((tick: MetronomeTick) => void) | null = null;
   private onAudioState: ((state: MetronomeAudioState) => void) | null = null;
-  private wakeLock: WakeLockHandle | null = null;
+  private wakeLock: WakeLockSentinel | null = null;
   private lifecycleAttached = false;
   private tickTimers = new Set<number>();
   private scheduledSources = new Set<OscillatorNode>();
@@ -364,16 +353,17 @@ export class StandaloneMetronomeEngine {
   }
 
   private async requestWakeLock(): Promise<void> {
-    if (document.visibilityState !== 'visible' || this.wakeLock) return;
-    const wakeLockApi = (navigator as WakeLockNavigator).wakeLock;
-    if (!wakeLockApi) return;
+    if (document.visibilityState !== 'visible' || this.wakeLock || !('wakeLock' in navigator)) return;
     try {
-      const lock = await wakeLockApi.request('screen');
+      const lock = await navigator.wakeLock.request('screen');
       this.wakeLock = lock;
       lock.addEventListener(
         'release',
         () => {
           if (this.wakeLock === lock) this.wakeLock = null;
+          if (this.running && document.visibilityState === 'visible') {
+            window.setTimeout(() => void this.requestWakeLock(), 250);
+          }
         },
         { once: true },
       );
