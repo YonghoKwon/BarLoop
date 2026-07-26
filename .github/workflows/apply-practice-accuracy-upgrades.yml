@@ -1,0 +1,36 @@
+name: Apply practice accuracy upgrades
+
+on:
+  push:
+    branches: [agent/practice-accuracy-and-coach-upgrades]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/practice-accuracy-and-coach-upgrades
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply application and documentation changes
+        run: python scripts/apply_practice_accuracy_upgrades.py
+      - name: Add Playwright test dependency
+        run: |
+          npm install --save-dev @playwright/test
+          npm pkg set scripts.test:e2e="playwright test"
+      - name: Remove temporary patch automation
+        run: rm scripts/apply_practice_accuracy_upgrades.py .github/workflows/apply-practice-accuracy-upgrades.yml
+      - name: Commit generated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Improve media practice accuracy and coaching"
+          git push origin HEAD:agent/practice-accuracy-and-coach-upgrades
