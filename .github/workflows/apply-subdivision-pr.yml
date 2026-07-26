@@ -20,6 +20,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Fix generated template escaping
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/apply_subdivision_counts.mjs')
+          text = path.read_text()
+          text = text.replace(
+              "return subdivisionIndex === 0 ? token : `${beatIndex + 1} ${token}`;",
+              "return subdivisionIndex === 0 ? token : `\\${beatIndex + 1} \\${token}`;",
+          )
+          path.write_text(text)
+          PY
       - run: node scripts/apply_subdivision_counts.mjs
       - run: rm -f .github/workflows/apply-subdivision-pr.yml
       - name: Commit generated changes
