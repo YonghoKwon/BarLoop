@@ -80,7 +80,7 @@ test('practice presets apply useful metronome settings', async ({ page }) => {
   await expect(page.getByLabel('메트로놈 BPM')).toHaveValue('100');
   const gapPanel = page.locator('section.lab-panel').filter({ has: page.getByRole('heading', { name: 'Gap Click' }) });
   await expect(gapPanel.locator('input[type="checkbox"]')).toBeChecked();
-  await expect(page.getByText('내부 박자 점검 프리셋을 적용했습니다.', { exact: false })).toBeVisible();
+  await expect(page.getByText('내부 박자 점검 설정을 적용했습니다.', { exact: false })).toBeVisible();
 });
 
 test('media practice keeps the guide moving with click output disabled', async ({ page }) => {
@@ -124,22 +124,20 @@ test('count-in and full practice overlay show the shared count grid', async ({ p
   await expectNoPageOverflow(page);
 });
 
-
-test('drummer training suite supports groove, sequencer and routines', async ({ page }) => {
-  await page.goto('/#metronome');
+test('drummer training page supports groove, sequencer and routines', async ({ page }) => {
+  await page.goto('/#drummer-training');
   const suite = page.getByLabel('그루브 패턴 메트로놈').locator('..');
   await expect(page.getByRole('heading', { name: '리듬·루틴 트레이닝' })).toBeVisible();
   await expect(page.getByLabel('커스텀 리듬 시퀀서')).toBeVisible();
   await expect(page.getByLabel('악센트 이동 트레이너')).toBeVisible();
   await expect(page.getByLabel('연습 루틴 빌더')).toBeVisible();
   await page.getByRole('button', { name: /16비트 펑크/ }).click();
-  await expect(page.getByText('16비트 펑크 그루브를 적용했습니다.')).toBeVisible();
+  await expect(page.getByText('16비트 펑크 패턴을 적용했습니다.')).toBeVisible();
   await page.getByLabel('킥 1 강세').click();
   await expect(page.getByLabel('킥 1 무음')).toBeVisible();
   await expectNoPageOverflow(page);
   await expect(suite).toBeVisible();
 });
-
 
 test('separates the metronome and drummer training pages', async ({ page }) => {
   await page.goto('/#metronome');
@@ -149,10 +147,10 @@ test('separates the metronome and drummer training pages', async ({ page }) => {
   await expect(page).toHaveURL(/#drummer-training/);
   await expect(page.getByRole('heading', { name: '드럼 트레이닝' })).toBeVisible();
   await expect(page.getByText('커스텀 16칸 시퀀서')).toBeVisible();
-  await expect(page.getByText('랙 탐')).toBeVisible();
-  await expect(page.getByText('플로어 탐')).toBeVisible();
-  await expect(page.getByText('라이드')).toBeVisible();
-  await expect(page.getByText('크래시')).toBeVisible();
+  await expect(page.getByText('랙 탐', { exact: true })).toBeVisible();
+  await expect(page.getByText('플로어 탐', { exact: true })).toBeVisible();
+  await expect(page.getByText('라이드', { exact: true })).toBeVisible();
+  await expect(page.getByText('크래시', { exact: true })).toBeVisible();
 });
 
 test('allows clearing and replacing the first downbeat input', async ({ page }) => {
