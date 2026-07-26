@@ -1,0 +1,41 @@
+name: Apply metronome polish
+
+on:
+  push:
+    branches: [agent/separate-drum-training-and-metronome-polish]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-metronome-polish
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/separate-drum-training-and-metronome-polish
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply integration changes
+        run: python scripts/apply_metronome_polish.py
+      - run: npm install
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:e2e
+      - name: Commit integrated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/lib/standaloneMetronome.ts src/drummer-training-page.css public/sw.js e2e/practice.spec.ts package-lock.json
+          git commit -m "Integrate metronome and training page polish"
+          git pull --rebase origin agent/separate-drum-training-and-metronome-polish
+          git push origin HEAD:agent/separate-drum-training-and-metronome-polish
