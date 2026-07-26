@@ -1,6 +1,6 @@
-import type { DrumInstrument, DrumPattern } from './drummerPractice';
+import { DRUM_INSTRUMENT_IDS, type DrumInstrument, type DrumPattern } from './drummerPractice';
 
-export type MetronomeSound = 'classic' | 'wood' | 'rim' | 'cowbell';
+export type MetronomeSound = 'classic' | 'wood' | 'rim' | 'cowbell' | 'digital' | 'clave' | 'shaker' | 'low';
 export type MetronomeSubdivision = 1 | 2 | 3 | 4;
 export type MetronomeAudioState =
   | 'idle'
@@ -275,7 +275,7 @@ export class StandaloneMetronomeEngine {
   ): boolean {
     const pattern = settings.rhythmPattern;
     if (!pattern) return false;
-    const instruments: DrumInstrument[] = ['kick', 'snare', 'hihat'];
+    const instruments: DrumInstrument[] = DRUM_INSTRUMENT_IDS;
     let sounded = false;
     instruments.forEach((instrument) => {
       const level = pattern.steps[instrument]?.[stepInBar] ?? 0;
@@ -297,16 +297,39 @@ export class StandaloneMetronomeEngine {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     const level = clamp(volume, 0, 1) * (accent ? 0.9 : 0.58);
-    const decay = instrument === 'hihat' ? 0.035 : instrument === 'snare' ? 0.07 : 0.11;
+    const decayByInstrument: Record<DrumInstrument, number> = {
+      crash: 0.18,
+      ride: 0.13,
+      hihat: 0.035,
+      rackTom: 0.13,
+      floorTom: 0.16,
+      snare: 0.07,
+      kick: 0.11,
+    };
+    const decay = decayByInstrument[instrument];
 
-    oscillator.type = instrument === 'hihat' ? 'square' : instrument === 'snare' ? 'triangle' : 'sine';
+    oscillator.type = instrument === 'hihat' || instrument === 'crash'
+      ? 'square'
+      : instrument === 'ride' || instrument === 'snare'
+        ? 'triangle'
+        : 'sine';
     if (instrument === 'kick') {
-      oscillator.frequency.setValueAtTime(accent ? 170 : 135, when);
-      oscillator.frequency.exponentialRampToValueAtTime(48, when + decay);
+      oscillator.frequency.setValueAtTime(accent ? 175 : 138, when);
+      oscillator.frequency.exponentialRampToValueAtTime(46, when + decay);
+    } else if (instrument === 'floorTom') {
+      oscillator.frequency.setValueAtTime(accent ? 155 : 132, when);
+      oscillator.frequency.exponentialRampToValueAtTime(72, when + decay);
+    } else if (instrument === 'rackTom') {
+      oscillator.frequency.setValueAtTime(accent ? 235 : 205, when);
+      oscillator.frequency.exponentialRampToValueAtTime(118, when + decay);
     } else if (instrument === 'snare') {
-      oscillator.frequency.setValueAtTime(accent ? 245 : 195, when);
+      oscillator.frequency.setValueAtTime(accent ? 255 : 205, when);
+    } else if (instrument === 'ride') {
+      oscillator.frequency.setValueAtTime(accent ? 2350 : 1900, when);
+    } else if (instrument === 'crash') {
+      oscillator.frequency.setValueAtTime(accent ? 4100 : 3350, when);
     } else {
-      oscillator.frequency.setValueAtTime(accent ? 7200 : 5800, when);
+      oscillator.frequency.setValueAtTime(accent ? 7600 : 6100, when);
     }
 
     gain.gain.setValueAtTime(0.0001, when);
@@ -337,11 +360,20 @@ export class StandaloneMetronomeEngine {
     const gain = context.createGain();
     const sound = settings.sound;
 
-    oscillator.type = sound === 'rim' ? 'square' : sound === 'cowbell' ? 'triangle' : 'sine';
-    const baseFrequency =
-      sound === 'wood' ? 820 : sound === 'rim' ? 1160 : sound === 'cowbell' ? 560 : 1040;
+    const soundConfig: Record<MetronomeSound, { type: OscillatorType; frequency: number; decay: number }> = {
+      classic: { type: 'sine', frequency: 1040, decay: 0.055 },
+      wood: { type: 'sine', frequency: 820, decay: 0.06 },
+      rim: { type: 'square', frequency: 1160, decay: 0.04 },
+      cowbell: { type: 'triangle', frequency: 560, decay: 0.09 },
+      digital: { type: 'square', frequency: 1480, decay: 0.027 },
+      clave: { type: 'triangle', frequency: 1780, decay: 0.042 },
+      shaker: { type: 'sawtooth', frequency: 6200, decay: 0.024 },
+      low: { type: 'sine', frequency: 320, decay: 0.078 },
+    };
+    const config = soundConfig[sound];
+    oscillator.type = config.type;
     oscillator.frequency.setValueAtTime(
-      accent ? baseFrequency * 1.45 : secondary ? baseFrequency * 0.72 : baseFrequency,
+      accent ? config.frequency * 1.45 : secondary ? config.frequency * 0.72 : config.frequency,
       when,
     );
 
@@ -351,7 +383,7 @@ export class StandaloneMetronomeEngine {
         ? settings.subdivisionVolume
         : settings.volume;
     const level = clamp(volume, 0, 1) * (accent ? 0.95 : secondary ? 0.45 : 0.72);
-    const decay = sound === 'cowbell' ? 0.09 : secondary ? 0.032 : 0.055;
+    const decay = secondary ? Math.min(config.decay, 0.032) : config.decay;
 
     gain.gain.setValueAtTime(0.0001, when);
     gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, level), when + 0.003);

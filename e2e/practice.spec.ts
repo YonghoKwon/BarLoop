@@ -139,3 +139,29 @@ test('drummer training suite supports groove, sequencer and routines', async ({ 
   await expectNoPageOverflow(page);
   await expect(suite).toBeVisible();
 });
+
+
+test('separates the metronome and drummer training pages', async ({ page }) => {
+  await page.goto('/#metronome');
+  await expect(page.getByRole('heading', { name: '드러머 메트로놈' })).toBeVisible();
+  await expect(page.getByText('커스텀 16칸 시퀀서')).toHaveCount(0);
+  await page.getByRole('button', { name: '드럼 트레이닝' }).click();
+  await expect(page).toHaveURL(/#drummer-training/);
+  await expect(page.getByRole('heading', { name: '드럼 트레이닝' })).toBeVisible();
+  await expect(page.getByText('커스텀 16칸 시퀀서')).toBeVisible();
+  await expect(page.getByText('랙 탐')).toBeVisible();
+  await expect(page.getByText('플로어 탐')).toBeVisible();
+  await expect(page.getByText('라이드')).toBeVisible();
+  await expect(page.getByText('크래시')).toBeVisible();
+});
+
+test('allows clearing and replacing the first downbeat input', async ({ page }) => {
+  await page.goto('/');
+  const downbeat = page.locator('#downbeat');
+  await expect(downbeat).toHaveValue('0.00');
+  await downbeat.fill('');
+  await expect(downbeat).toHaveValue('');
+  await downbeat.fill('5.45');
+  await downbeat.blur();
+  await expect(downbeat).toHaveValue('5.45');
+});

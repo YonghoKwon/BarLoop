@@ -63,3 +63,16 @@
 @media (prefers-reduced-motion: reduce) {
   .accent-flash-wave { animation: none; opacity: .45; }
 }
+
+
+.mode-launcher-group { position: fixed; z-index: 75; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+.mode-launcher-group .mode-launcher { position: static; min-height: 46px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; background: #171b25; color: white; box-shadow: 0 10px 30px rgba(0,0,0,.35); font-weight: 850; }
+.mode-launcher-group .mode-launcher.training { background: #8b442d; border-color: #a95637; }
+.metronome-page-nav { display: flex; flex-direction: column; gap: 7px; }
+.beat-orbit { position: relative; overflow: visible; }
+.metronome-flash { inset: -4px; }
+@media (max-width: 700px) {
+  .mode-launcher-group { left: 8px; right: 8px; bottom: calc(66px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; }
+  .mode-launcher-group .mode-launcher { min-width: 0; padding-inline: 10px; font-size: .78rem; }
+  .metronome-page-nav { flex-direction: row; }
+}
