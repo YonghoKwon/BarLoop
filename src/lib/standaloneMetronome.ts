@@ -1,3 +1,5 @@
+import type { DrumInstrument, DrumPattern } from './drummerPractice';
+
 export type MetronomeSound = 'classic' | 'wood' | 'rim' | 'cowbell';
 export type MetronomeSubdivision = 1 | 2 | 3 | 4;
 export type MetronomeAudioState =
@@ -25,12 +27,17 @@ export interface StandaloneMetronomeSettings {
   gapEnabled: boolean;
   gapPlayBars: number;
   gapMuteBars: number;
+  rhythmEnabled?: boolean;
+  rhythmPattern?: DrumPattern;
+  rhythmVolume?: number;
+  movingAccentStep?: number | null;
 }
 
 export interface MetronomeTick {
   beatInBar: number;
   subdivisionInBeat: number;
   barIndex: number;
+  stepInBar: number;
   audible: boolean;
 }
 
@@ -236,17 +243,85 @@ export class StandaloneMetronomeEngine {
       settings.gapPlayBars,
       settings.gapMuteBars,
     );
-    const accented = subdivisionInBeat === 0 && Boolean(settings.accents[beatInBar]);
+    const stepInBar = beatInBar * 4 + (settings.subdivision === 4
+      ? subdivisionInBeat
+      : Math.min(3, Math.floor(subdivisionInBeat * 4 / settings.subdivision)));
+    const movingAccent = settings.movingAccentStep === stepInBar;
+    const accented = (subdivisionInBeat === 0 && Boolean(settings.accents[beatInBar])) || movingAccent;
 
-    if (audible) this.scheduleClick(when, accented, subdivisionInBeat !== 0, settings);
+    if (audible) {
+      if (settings.rhythmEnabled && settings.rhythmPattern && settings.subdivision === 4) {
+        const sounded = this.scheduleDrumPatternStep(when, stepInBar, movingAccent, settings);
+        if (movingAccent && !sounded) this.scheduleClick(when, true, true, settings);
+      } else {
+        this.scheduleClick(when, accented, subdivisionInBeat !== 0, settings);
+      }
+    }
 
     const delay = Math.max(0, (when - (this.context?.currentTime ?? when)) * 1000);
     const timer = window.setTimeout(() => {
       this.tickTimers.delete(timer);
       if (!this.running) return;
-      this.onTick?.({ beatInBar, subdivisionInBeat, barIndex, audible });
+      this.onTick?.({ beatInBar, subdivisionInBeat, barIndex, stepInBar, audible });
     }, delay);
     this.tickTimers.add(timer);
+  }
+
+  private scheduleDrumPatternStep(
+    when: number,
+    stepInBar: number,
+    movingAccent: boolean,
+    settings: StandaloneMetronomeSettings,
+  ): boolean {
+    const pattern = settings.rhythmPattern;
+    if (!pattern) return false;
+    const instruments: DrumInstrument[] = ['kick', 'snare', 'hihat'];
+    let sounded = false;
+    instruments.forEach((instrument) => {
+      const level = pattern.steps[instrument]?.[stepInBar] ?? 0;
+      if (level === 0) return;
+      sounded = true;
+      this.scheduleDrumVoice(when, instrument, level === 2 || movingAccent, settings.rhythmVolume ?? settings.volume);
+    });
+    return sounded;
+  }
+
+  private scheduleDrumVoice(
+    when: number,
+    instrument: DrumInstrument,
+    accent: boolean,
+    volume: number,
+  ): void {
+    const context = this.context;
+    if (!context || context.state !== 'running') return;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const level = clamp(volume, 0, 1) * (accent ? 0.9 : 0.58);
+    const decay = instrument === 'hihat' ? 0.035 : instrument === 'snare' ? 0.07 : 0.11;
+
+    oscillator.type = instrument === 'hihat' ? 'square' : instrument === 'snare' ? 'triangle' : 'sine';
+    if (instrument === 'kick') {
+      oscillator.frequency.setValueAtTime(accent ? 170 : 135, when);
+      oscillator.frequency.exponentialRampToValueAtTime(48, when + decay);
+    } else if (instrument === 'snare') {
+      oscillator.frequency.setValueAtTime(accent ? 245 : 195, when);
+    } else {
+      oscillator.frequency.setValueAtTime(accent ? 7200 : 5800, when);
+    }
+
+    gain.gain.setValueAtTime(0.0001, when);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, level), when + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + decay);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    this.scheduledSources.add(oscillator);
+    oscillator.addEventListener('ended', () => {
+      this.scheduledSources.delete(oscillator);
+      oscillator.disconnect();
+      gain.disconnect();
+    }, { once: true });
+    oscillator.start(when);
+    oscillator.stop(when + decay + 0.02);
   }
 
   private scheduleClick(

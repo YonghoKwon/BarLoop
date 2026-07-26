@@ -1,4 +1,4 @@
-const CACHE_NAME = 'barloop-shell-v12';
+const CACHE_NAME = 'barloop-shell-v13';
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {

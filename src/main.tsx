@@ -8,7 +8,9 @@ import './media-practice.css';
 import './ios-responsive.css';
 import './ios-overflow-fix.css';
 import './full-bar-guide.css';
+import './drummer-training.css';
 
+// Load every training stylesheet before booting the PWA on mobile Safari.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     void navigator.serviceWorker.register('./sw.js').catch(() => undefined);

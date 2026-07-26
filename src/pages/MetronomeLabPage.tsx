@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BpmNumberInput from '../components/BpmNumberInput';
+import DrummerTrainingSuite from '../components/DrummerTrainingSuite';
 import { preparePlaybackAudioSession, releasePlaybackAudioSession } from '../lib/audioPlaybackSession';
 import { clampBpm } from '../lib/bpm';
+import {
+  DEFAULT_CUSTOM_PATTERN,
+  DEFAULT_ROUTINE,
+  grooveById,
+  nextMovingAccentIndex,
+  normalizePattern,
+  type DrumPattern,
+  type PracticeRoutineStep,
+} from '../lib/drummerPractice';
 import {
   buildSubdivisionCountGroups,
   getCurrentSubdivisionCount,
@@ -133,6 +143,13 @@ interface StoredLabSettings {
   trainerBars: number;
   timerMinutes: number;
   practicePresetIndex: number;
+  rhythmEnabled: boolean;
+  rhythmPattern: DrumPattern;
+  accentTrainerEnabled: boolean;
+  accentEveryBars: number;
+  accentMode: 'forward' | 'random';
+  movingAccentStep: number;
+  routineSteps: PracticeRoutineStep[];
 }
 
 const DEFAULTS: StoredLabSettings = {
@@ -155,7 +172,29 @@ const DEFAULTS: StoredLabSettings = {
   trainerBars: 4,
   timerMinutes: 10,
   practicePresetIndex: 1,
+  rhythmEnabled: false,
+  rhythmPattern: DEFAULT_CUSTOM_PATTERN,
+  accentTrainerEnabled: false,
+  accentEveryBars: 1,
+  accentMode: 'forward',
+  movingAccentStep: 0,
+  routineSteps: DEFAULT_ROUTINE,
 };
+
+function normalizeRoutine(value: unknown): PracticeRoutineStep[] {
+  if (!Array.isArray(value) || value.length === 0) return DEFAULT_ROUTINE.map((step) => ({ ...step }));
+  return value.slice(0, 12).map((raw, index) => {
+    const item = raw as Partial<PracticeRoutineStep>;
+    return {
+      id: typeof item.id === 'string' ? item.id : `step-${index + 1}`,
+      name: typeof item.name === 'string' && item.name.trim() ? item.name : `단계 ${index + 1}`,
+      bpm: clampBpm(Number(item.bpm) || 90),
+      bars: Math.min(128, Math.max(1, Math.round(Number(item.bars) || 8))),
+      patternId: typeof item.patternId === 'string' ? item.patternId : 'basic-rock',
+      accentTrainer: Boolean(item.accentTrainer),
+    };
+  });
+}
 
 function readSettings(): StoredLabSettings {
   try {
@@ -168,6 +207,11 @@ function readSettings(): StoredLabSettings {
       ...DEFAULTS,
       ...stored,
       countMode,
+      rhythmPattern: normalizePattern(stored.rhythmPattern),
+      routineSteps: normalizeRoutine(stored.routineSteps),
+      accentEveryBars: [1, 2, 4].includes(Number(stored.accentEveryBars)) ? Number(stored.accentEveryBars) : 1,
+      accentMode: stored.accentMode === 'random' ? 'random' : 'forward',
+      movingAccentStep: Math.min(15, Math.max(0, Math.round(Number(stored.movingAccentStep) || 0))),
       practicePresetIndex: Math.min(
         PRACTICE_PRESETS.length - 1,
         Math.max(
@@ -198,6 +242,10 @@ export default function MetronomeLabPage() {
   const engineRef = useRef(new StandaloneMetronomeEngine());
   const tapTimesRef = useRef<number[]>([]);
   const barCountRef = useRef(0);
+  const routineBarRef = useRef(0);
+  const routineRunningRef = useRef(false);
+  const routineIndexRef = useRef(0);
+  const pendingRoutineStartRef = useRef(false);
 
   const [bpm, setBpm] = useState(initial.bpm);
   const [beatsPerBar, setBeatsPerBar] = useState(initial.beatsPerBar);
@@ -218,6 +266,17 @@ export default function MetronomeLabPage() {
   const [trainerBars, setTrainerBars] = useState(initial.trainerBars);
   const [timerMinutes, setTimerMinutes] = useState(initial.timerMinutes);
   const [practicePresetIndex, setPracticePresetIndex] = useState(initial.practicePresetIndex);
+  const [rhythmEnabled, setRhythmEnabled] = useState(initial.rhythmEnabled);
+  const [rhythmPattern, setRhythmPattern] = useState<DrumPattern>(normalizePattern(initial.rhythmPattern));
+  const [accentTrainerEnabled, setAccentTrainerEnabled] = useState(initial.accentTrainerEnabled);
+  const [accentEveryBars, setAccentEveryBars] = useState(initial.accentEveryBars);
+  const [accentMode, setAccentMode] = useState<'forward' | 'random'>(initial.accentMode);
+  const [movingAccentStep, setMovingAccentStep] = useState(initial.movingAccentStep);
+  const [routineSteps, setRoutineSteps] = useState<PracticeRoutineStep[]>(normalizeRoutine(initial.routineSteps));
+  const [routineRunning, setRoutineRunning] = useState(false);
+  const [routineIndex, setRoutineIndex] = useState(0);
+  const [routineBarInStep, setRoutineBarInStep] = useState(0);
+  const [activeStep, setActiveStep] = useState(0);
   const [running, setRunning] = useState(false);
   const [beatInBar, setBeatInBar] = useState(0);
   const [subdivisionInBeat, setSubdivisionInBeat] = useState(0);
@@ -225,6 +284,15 @@ export default function MetronomeLabPage() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [audible, setAudible] = useState(true);
   const [notice, setNotice] = useState('');
+
+  routineRunningRef.current = routineRunning;
+  routineIndexRef.current = routineIndex;
+  const routineStepsRef = useRef(routineSteps);
+  routineStepsRef.current = routineSteps;
+  const rhythmPatternRef = useRef(rhythmPattern);
+  rhythmPatternRef.current = rhythmPattern;
+  const accentTrainerRef = useRef({ enabled: accentTrainerEnabled, everyBars: accentEveryBars, mode: accentMode });
+  accentTrainerRef.current = { enabled: accentTrainerEnabled, everyBars: accentEveryBars, mode: accentMode };
 
   const voiceSupported = isKoreanCountVoiceSupported();
   const voiceConfigRef = useRef({ countMode, bpm, volume, accentVolume, accents });
@@ -244,6 +312,10 @@ export default function MetronomeLabPage() {
       gapEnabled,
       gapPlayBars,
       gapMuteBars,
+      rhythmEnabled,
+      rhythmPattern,
+      rhythmVolume: volume,
+      movingAccentStep: accentTrainerEnabled ? movingAccentStep : null,
     }),
     [
       accentVolume,
@@ -253,6 +325,10 @@ export default function MetronomeLabPage() {
       gapEnabled,
       gapMuteBars,
       gapPlayBars,
+      rhythmEnabled,
+      rhythmPattern,
+      accentTrainerEnabled,
+      movingAccentStep,
       sound,
       subdivision,
       subdivisionVolume,
@@ -290,9 +366,16 @@ export default function MetronomeLabPage() {
         trainerBars,
         timerMinutes,
         practicePresetIndex,
+        rhythmEnabled,
+        rhythmPattern,
+        accentTrainerEnabled,
+        accentEveryBars,
+        accentMode,
+        movingAccentStep,
+        routineSteps,
       }),
     );
-  }, [countMode, practicePresetIndex, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]);
+  }, [accentEveryBars, accentMode, accentTrainerEnabled, countMode, movingAccentStep, practicePresetIndex, rhythmEnabled, rhythmPattern, routineSteps, settings, timerMinutes, trainerBars, trainerEnabled, trainerStep, trainerTarget]);
 
   useEffect(() => {
     engineRef.current.update(engineSettings);
@@ -343,6 +426,19 @@ export default function MetronomeLabPage() {
     [],
   );
 
+  const applyRoutineStep = useCallback((step: PracticeRoutineStep) => {
+    const nextPattern = grooveById(step.patternId, rhythmPatternRef.current);
+    setBpm(clampBpm(step.bpm));
+    setBeatsPerBar(4);
+    setSubdivision(4);
+    setSwing(nextPattern.swing);
+    setRhythmPattern(nextPattern);
+    setRhythmEnabled(true);
+    setAccentTrainerEnabled(step.accentTrainer);
+    setTimerMinutes(0);
+    setMovingAccentStep(0);
+  }, []);
+
   const start = useCallback(async () => {
     setNotice('');
     barCountRef.current = 0;
@@ -360,6 +456,7 @@ export default function MetronomeLabPage() {
         setBeatInBar(tick.beatInBar);
         setSubdivisionInBeat(tick.subdivisionInBeat);
         setAudible(tick.audible);
+        setActiveStep(tick.stepInBar);
 
         const voice = voiceConfigRef.current;
         if (
@@ -379,6 +476,37 @@ export default function MetronomeLabPage() {
           if (trainerEnabled && nextBars % Math.max(1, trainerBars) === 0) {
             setBpm((current) => Math.min(clampBpm(trainerTarget), current + Math.max(1, trainerStep)));
           }
+
+          const accentConfig = accentTrainerRef.current;
+          if (accentConfig.enabled && nextBars % Math.max(1, accentConfig.everyBars) === 0) {
+            setMovingAccentStep((current) => nextMovingAccentIndex(current, accentConfig.mode));
+          }
+
+          if (routineRunningRef.current) {
+            const steps = routineStepsRef.current;
+            const currentIndex = routineIndexRef.current;
+            const currentStep = steps[currentIndex];
+            const completedInStep = routineBarRef.current + 1;
+            if (currentStep && completedInStep >= currentStep.bars) {
+              const nextIndex = currentIndex + 1;
+              if (nextIndex < steps.length) {
+                routineBarRef.current = 0;
+                routineIndexRef.current = nextIndex;
+                setRoutineIndex(nextIndex);
+                setRoutineBarInStep(0);
+                applyRoutineStep(steps[nextIndex]);
+                setNotice(`루틴 ${nextIndex + 1}단계 · ${steps[nextIndex].name}`);
+              } else {
+                routineRunningRef.current = false;
+                setRoutineRunning(false);
+                setNotice('연습 루틴을 모두 완료했습니다.');
+                window.setTimeout(() => stop(), 0);
+              }
+            } else {
+              routineBarRef.current = completedInStep;
+              setRoutineBarInStep(completedInStep);
+            }
+          }
         }
       });
 
@@ -388,7 +516,14 @@ export default function MetronomeLabPage() {
       releasePlaybackAudioSession();
       setNotice(error instanceof Error ? error.message : '메트로놈을 시작할 수 없습니다.');
     }
-  }, [countMode, engineSettings, trainerBars, trainerEnabled, trainerStep, trainerTarget, voiceSupported]);
+  }, [applyRoutineStep, countMode, engineSettings, stop, trainerBars, trainerEnabled, trainerStep, trainerTarget, voiceSupported]);
+
+  useEffect(() => {
+    if (!pendingRoutineStartRef.current || running) return;
+    pendingRoutineStartRef.current = false;
+    const timer = window.setTimeout(() => void start(), 50);
+    return () => window.clearTimeout(timer);
+  }, [engineSettings, running, start]);
 
   const testVoice = useCallback(async () => {
     setNotice('');
@@ -408,6 +543,40 @@ export default function MetronomeLabPage() {
     const intervals = tapTimesRef.current.slice(1).map((time, index) => time - tapTimesRef.current[index]);
     const average = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
     setBpm(clampBpm(60000 / average));
+  };
+
+  const applyGroovePattern = (nextPattern: DrumPattern) => {
+    const normalized = normalizePattern(nextPattern);
+    setRhythmPattern(normalized);
+    setRhythmEnabled(true);
+    setSubdivision(4);
+    setSwing(normalized.swing);
+    setNotice(`${normalized.name} 그루브를 적용했습니다.`);
+  };
+
+  const startRoutine = () => {
+    if (running) stop();
+    const steps = normalizeRoutine(routineSteps);
+    setRoutineSteps(steps);
+    routineStepsRef.current = steps;
+    routineBarRef.current = 0;
+    routineIndexRef.current = 0;
+    routineRunningRef.current = true;
+    setRoutineIndex(0);
+    setRoutineBarInStep(0);
+    setRoutineRunning(true);
+    applyRoutineStep(steps[0]);
+    pendingRoutineStartRef.current = true;
+    setNotice(`루틴 1단계 · ${steps[0].name}`);
+  };
+
+  const stopRoutine = () => {
+    routineRunningRef.current = false;
+    setRoutineRunning(false);
+    routineBarRef.current = 0;
+    setRoutineBarInStep(0);
+    if (running) stop();
+    setNotice('연습 루틴을 중지했습니다.');
   };
 
   const practicePreset = PRACTICE_PRESETS[Math.min(PRACTICE_PRESETS.length - 1, Math.max(0, practicePresetIndex))];
@@ -632,6 +801,29 @@ export default function MetronomeLabPage() {
               <label>증가 주기<input type="number" min={1} max={64} value={trainerBars} onChange={(event) => setTrainerBars(Math.max(1, Number(event.target.value)))} /><span className="field-suffix">마디</span></label>
             </div>
           </section>
+
+          <DrummerTrainingSuite
+            pattern={rhythmPattern}
+            rhythmEnabled={rhythmEnabled}
+            activeStep={activeStep}
+            onPatternChange={setRhythmPattern}
+            onApplyGroove={applyGroovePattern}
+            onRhythmEnabledChange={setRhythmEnabled}
+            accentTrainerEnabled={accentTrainerEnabled}
+            accentEveryBars={accentEveryBars}
+            accentMode={accentMode}
+            movingAccentStep={movingAccentStep}
+            onAccentTrainerChange={(enabled) => { setAccentTrainerEnabled(enabled); if (enabled) setSubdivision(4); }}
+            onAccentEveryBarsChange={setAccentEveryBars}
+            onAccentModeChange={setAccentMode}
+            routineSteps={routineSteps}
+            routineRunning={routineRunning}
+            routineIndex={routineIndex}
+            routineBarInStep={routineBarInStep}
+            onRoutineChange={setRoutineSteps}
+            onStartRoutine={startRoutine}
+            onStopRoutine={stopRoutine}
+          />
 
           <section className="panel lab-panel practice-preset-panel">
             <div className="section-title-row">
