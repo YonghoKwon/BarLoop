@@ -20,10 +20,14 @@ function createWavBuffer(durationSeconds = 4, sampleRate = 8000): Buffer {
   return buffer;
 }
 
+function subdivisionSelect(scope: Page | ReturnType<Page['locator']>) {
+  return scope.locator('label').filter({ hasText: '서브디비전' }).locator('select').first();
+}
+
 async function loadLocalAudio(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '내 영상·음원' }).click();
-  await page.locator('input[type="file"]').setInputFiles({
+  await page.locator('.drop-zone input[type="file"][accept*="audio"]').setInputFiles({
     name: 'practice.wav',
     mimeType: 'audio/wav',
     buffer: createWavBuffer(),
@@ -34,7 +38,7 @@ async function loadLocalAudio(page: Page) {
 test('standalone metronome exposes the full subdivision guide', async ({ page }) => {
   await page.goto('/#metronome');
   await expect(page.getByRole('heading', { name: '드러머 메트로놈' })).toBeVisible();
-  await page.getByLabel('서브디비전').selectOption('4');
+  await subdivisionSelect(page).selectOption('4');
   const guide = page.getByLabel('한 마디 서브디비전 카운트');
   await expect(guide).toContainText('1');
   await expect(guide).toContainText('e');
@@ -45,8 +49,8 @@ test('standalone metronome exposes the full subdivision guide', async ({ page })
 test('media practice keeps the guide moving with click output disabled', async ({ page }) => {
   await loadLocalAudio(page);
   const panel = page.getByRole('heading', { name: '메트로놈·카운트인' }).locator('..').locator('..');
-  await panel.getByLabel('서브디비전').selectOption('4');
-  await panel.getByLabel('카운트인').selectOption('0');
+  await subdivisionSelect(panel).selectOption('4');
+  await panel.getByLabel('카운트인', { exact: true }).selectOption('0');
   await expect(panel.getByLabel('한 마디 서브디비전 카운트')).toBeVisible();
 
   await page.locator('.play-button').click();
@@ -61,16 +65,17 @@ test('media practice keeps the guide moving with click output disabled', async (
 test('count-in and full practice overlay show the shared count grid', async ({ page }) => {
   await loadLocalAudio(page);
   const panel = page.getByRole('heading', { name: '메트로놈·카운트인' }).locator('..').locator('..');
-  await panel.getByLabel('서브디비전').selectOption('4');
-  await panel.getByLabel('카운트인').selectOption('1');
-  await panel.getByLabel('카운트인 클릭').selectOption('subdivision');
+  await subdivisionSelect(panel).selectOption('4');
+  await panel.getByLabel('카운트인', { exact: true }).selectOption('1');
+  await panel.getByLabel('카운트인 클릭', { exact: true }).selectOption('subdivision');
 
   await page.locator('.play-button').click();
-  await expect(panel.getByText('카운트인', { exact: false })).toBeVisible();
+  await expect(panel.getByText('카운트인', { exact: false }).first()).toBeVisible();
   await expect(panel.getByLabel('한 마디 서브디비전 카운트')).toBeVisible();
 
   await page.getByRole('button', { name: '연습 화면' }).click();
-  await expect(page.getByRole('dialog', { name: '드러머 연습 모드' })).toBeVisible();
-  await expect(page.getByText('DRUM PRACTICE')).toBeVisible();
-  await expect(page.getByRole('dialog').getByLabel('한 마디 서브디비전 카운트')).toBeVisible();
+  const dialog = page.getByRole('dialog', { name: '드러머 연습 모드' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('DRUM PRACTICE')).toBeVisible();
+  await expect(dialog.getByLabel('한 마디 서브디비전 카운트')).toBeVisible();
 });
