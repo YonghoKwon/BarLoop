@@ -8,6 +8,7 @@ import {
   type MouseEvent,
 } from 'react';
 import LocalMediaPlayer from './components/LocalMediaPlayer';
+import MediaPracticePanel from './components/MediaPracticePanel';
 import MetronomePanel from './components/MetronomePanel';
 import MidiControlPanel from './components/MidiControlPanel';
 import PracticeModeOverlay from './components/PracticeModeOverlay';
@@ -34,6 +35,8 @@ interface StoredSettings {
   playbackRate: number;
   loopEnabled: boolean;
   preservePitch: boolean;
+  mediaVolume: number;
+  preRollBeats: number;
   metronomeEnabled: boolean;
   countInBars: number;
   subdivision: Subdivision;
@@ -66,6 +69,8 @@ const DEFAULT_SETTINGS: StoredSettings = {
   playbackRate: 1,
   loopEnabled: true,
   preservePitch: true,
+  mediaVolume: 0.85,
+  preRollBeats: 4,
   metronomeEnabled: false,
   countInBars: 1,
   subdivision: 1,
@@ -100,6 +105,8 @@ function readStoredSettings(): StoredSettings {
         : DEFAULT_SETTINGS.playbackRate,
       loopEnabled: typeof parsed.loopEnabled === 'boolean' ? parsed.loopEnabled : true,
       preservePitch: typeof parsed.preservePitch === 'boolean' ? parsed.preservePitch : true,
+      mediaVolume: typeof parsed.mediaVolume === 'number' ? clamp(parsed.mediaVolume, 0, 1) : 0.85,
+      preRollBeats: clamp(Math.round(Number(parsed.preRollBeats) || 4), 0, 24),
       metronomeEnabled: Boolean(parsed.metronomeEnabled),
       countInBars: [0, 1, 2, 4].includes(Number(parsed.countInBars)) ? Number(parsed.countInBars) : 1,
       subdivision: [1, 2, 3, 4].includes(Number(parsed.subdivision))
@@ -167,6 +174,8 @@ function App() {
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(initialSettingsRef.current.playbackRate);
   const [preservePitch, setPreservePitch] = useState(initialSettingsRef.current.preservePitch);
+  const [mediaVolume, setMediaVolume] = useState(initialSettingsRef.current.mediaVolume);
+  const [preRollBeats, setPreRollBeats] = useState(initialSettingsRef.current.preRollBeats);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -248,6 +257,8 @@ function App() {
     playbackRate,
     loopEnabled,
     preservePitch,
+    mediaVolume,
+    preRollBeats,
     metronomeEnabled,
     countInBars,
     subdivision,
@@ -267,7 +278,9 @@ function App() {
     metronomeEnabled,
     metronomeVolume,
     midiMappings,
+    mediaVolume,
     playbackRate,
+    preRollBeats,
     preservePitch,
     subdivision,
   ]);
@@ -278,6 +291,10 @@ function App() {
     setPlaybackRate(safeRate);
     playerRef.current?.setPlaybackRate(safeRate);
   }, []);
+
+  useEffect(() => {
+    playerRef.current?.setVolume(mediaVolume);
+  }, [isReady, mediaVolume]);
 
   const stopTrainerTimers = useCallback(() => {
     window.clearTimeout(trainerTimerRef.current);
@@ -366,6 +383,30 @@ function App() {
   }, [bars, seekTo, selectedBars]);
 
   const restartLoop = useCallback(() => seekTo(activeLoop.start), [activeLoop.start, seekTo]);
+
+  const playFromPreRoll = useCallback(async () => {
+    if (!isReady) return;
+    const secondsPerBeat = 60 / Math.max(20, Number.isFinite(bpm) ? bpm : 120);
+    seekTo(Math.max(0, activeLoop.start - preRollBeats * secondsPerBeat));
+    try {
+      await playerRef.current?.play();
+      setNotice(preRollBeats > 0 ? `${preRollBeats}박 프리롤부터 재생합니다.` : 'A 지점부터 재생합니다.');
+    } catch {
+      setError('프리롤 재생을 시작할 수 없습니다. 화면을 한 번 탭한 뒤 다시 시도해 주세요.');
+    }
+  }, [activeLoop.start, bpm, isReady, preRollBeats, seekTo]);
+
+  const applyFillPreset = useCallback((grooveBars: 3 | 7) => {
+    if (!selectedBars || bars.length === 0) {
+      setError('Fill Trainer를 사용하려면 마디를 먼저 생성해 주세요.');
+      return;
+    }
+    const nextEnd = Math.min(bars.length - 1, selectedBars.startIndex + grooveBars);
+    setLoopMode('bars');
+    setSelectedBarEnd(nextEnd);
+    seekTo(bars[selectedBars.startIndex].start);
+    setNotice(`${grooveBars}마디 그루브 + 1마디 필인 범위를 선택했습니다.`);
+  }, [bars, seekTo, selectedBars]);
 
   const metronomeSettings = useMemo<MetronomeSettings>(() => ({
     bpm: Number.isFinite(bpm) && bpm > 0 ? bpm : 120,
@@ -746,6 +787,8 @@ function App() {
     applySpeed(DEFAULT_SETTINGS.playbackRate);
     setLoopEnabled(true);
     setPreservePitch(true);
+    setMediaVolume(0.85);
+    setPreRollBeats(beatsPerBar);
     setMetronomeEnabled(false);
     setCountInBars(1);
     setSubdivision(1);
@@ -812,8 +855,8 @@ function App() {
           <section className="panel player-panel">
             <div className="video-stage">
               {!hasActiveSource && <div className="empty-player"><div className="empty-player-icon">▶</div><strong>연습할 미디어를 불러와 주세요</strong><span>YouTube, 휴대폰 파일, 태블릿 파일을 사용할 수 있습니다.</span></div>}
-              {sourceType === 'youtube' && youtubeVideoId && <YouTubePlayer key={youtubeVideoId} ref={playerRef} videoId={youtubeVideoId} playbackRate={playbackRate} onReady={handleReady} onPlayingChange={setIsPlaying} onError={handlePlayerError} />}
-              {sourceType === 'local' && localFile && <LocalMediaPlayer key={localFile.url} ref={playerRef} src={localFile.url} name={localFile.name} kind={localFile.kind} playbackRate={playbackRate} preservePitch={preservePitch} onReady={handleReady} onPlayingChange={setIsPlaying} onError={handlePlayerError} />}
+              {sourceType === 'youtube' && youtubeVideoId && <YouTubePlayer key={youtubeVideoId} ref={playerRef} videoId={youtubeVideoId} playbackRate={playbackRate} volume={mediaVolume} onReady={handleReady} onPlayingChange={setIsPlaying} onError={handlePlayerError} />}
+              {sourceType === 'local' && localFile && <LocalMediaPlayer key={localFile.url} ref={playerRef} src={localFile.url} name={localFile.name} kind={localFile.kind} playbackRate={playbackRate} preservePitch={preservePitch} volume={mediaVolume} onReady={handleReady} onPlayingChange={setIsPlaying} onError={handlePlayerError} />}
             </div>
 
             <WaveformLoopEditor peaks={waveformPeaks} duration={duration} currentTime={currentTime} loopStart={activeLoop.start} loopEnd={activeLoop.end} disabled={!isReady} onSeek={seekTo} onLoopChange={(start, end) => { setLoopMode('time'); setTimeLoopStart(start); setTimeLoopEnd(end); }} />
@@ -864,6 +907,7 @@ function App() {
         </div>
 
         <div className="tools-grid">
+          <MediaPracticePanel mediaVolume={mediaVolume} onMediaVolumeChange={setMediaVolume} preRollBeats={preRollBeats} onPreRollBeatsChange={setPreRollBeats} beatsPerBar={beatsPerBar} bpm={Number.isFinite(bpm) ? bpm : 120} disabled={!isReady} canUseBars={bars.length >= 4} onPlayPreRoll={() => void playFromPreRoll()} onFillPreset={applyFillPreset} />
           <MetronomePanel enabled={metronomeEnabled} onEnabledChange={setMetronomeEnabled} countInBars={countInBars} onCountInBarsChange={setCountInBars} subdivision={subdivision} onSubdivisionChange={setSubdivision} volume={metronomeVolume} onVolumeChange={setMetronomeVolume} gapEnabled={gapEnabled} onGapEnabledChange={setGapEnabled} gapPlayBars={gapPlayBars} gapMuteBars={gapMuteBars} onGapPlayBarsChange={(value) => setGapPlayBars(clamp(Math.round(value), 1, 16))} onGapMuteBarsChange={(value) => setGapMuteBars(clamp(Math.round(value), 1, 16))} beatInBar={beatInBar} beatsPerBar={beatsPerBar} audibleBeat={audibleBeat} countInRemaining={countInRemaining} />
           <TempoTrainerPanel settings={trainerSettings} currentBpm={trainerCurrentBpm} baseBpm={Number.isFinite(bpm) ? bpm : 120} active={trainerActive} onChange={setTrainerSettings} onStart={startTrainer} onStop={stopTrainer} />
           <SectionPresetPanel mediaKey={mediaKey} sections={sections} currentStart={activeLoop.start} currentEnd={activeLoop.end} bpm={Number.isFinite(bpm) ? bpm : 120} playbackRate={playbackRate} disabled={!isReady} onSectionsChange={setSections} onLoad={loadSection} onNotice={(message) => { setNotice(message); setError(''); }} onError={(message) => { setError(message); setNotice(''); }} />
