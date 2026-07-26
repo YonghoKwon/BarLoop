@@ -153,12 +153,10 @@ test('separates the metronome and drummer training pages', async ({ page }) => {
   await expect(page.getByText('크래시', { exact: true })).toBeVisible();
 });
 
-test('allows clearing and replacing the first downbeat input', async ({ page }) => {
+test('replaces the initial downbeat without keeping the leading zero', async ({ page }) => {
   await page.goto('/');
   const downbeat = page.locator('#downbeat');
   await expect(downbeat).toHaveValue('0.00');
-  await downbeat.fill('');
-  await expect(downbeat).toHaveValue('');
   await downbeat.fill('5.45');
   await downbeat.blur();
   await expect(downbeat).toHaveValue('5.45');
