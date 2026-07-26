@@ -31,6 +31,19 @@ jobs:
       - name: Apply drummer training integration
         if: github.actor != 'github-actions[bot]' && github.head_ref == 'agent/drummer-training-suite'
         run: python scripts/apply_drummer_training_suite.py
+      - name: Commit generated drummer integration
+        if: github.actor != 'github-actions[bot]' && github.head_ref == 'agent/drummer-training-suite'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/standaloneMetronome.ts src/pages/MetronomeLabPage.tsx e2e/practice.spec.ts public/sw.js package-lock.json
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit"
+          else
+            git commit -m "Integrate drummer training suite"
+            git pull --rebase origin agent/drummer-training-suite
+            git push origin HEAD:agent/drummer-training-suite
+          fi
       - run: npm install
       - name: Run unit tests
         id: unit-tests
@@ -45,7 +58,19 @@ jobs:
       - name: Stop after unit test failure
         if: steps.unit-tests.outcome != 'success'
         run: exit 1
-      - run: npm run build
+      - name: Run production build
+        id: production-build
+        continue-on-error: true
+        run: npm run build > build-results.txt 2>&1
+      - name: Upload failed build diagnostics
+        if: steps.production-build.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-results
+          path: build-results.txt
+      - name: Stop after build failure
+        if: steps.production-build.outcome != 'success'
+        run: exit 1
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
       - name: Run browser tests
@@ -64,19 +89,6 @@ jobs:
       - name: Stop after browser test failure
         if: steps.browser-tests.outcome != 'success'
         run: exit 1
-      - name: Commit generated drummer integration
-        if: github.actor != 'github-actions[bot]' && github.head_ref == 'agent/drummer-training-suite'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/standaloneMetronome.ts src/pages/MetronomeLabPage.tsx e2e/practice.spec.ts public/sw.js package-lock.json
-          if git diff --cached --quiet; then
-            echo "No generated changes to commit"
-          else
-            git commit -m "Integrate drummer training suite"
-            git pull --rebase origin agent/drummer-training-suite
-            git push origin HEAD:agent/drummer-training-suite
-          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
