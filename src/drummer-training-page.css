@@ -1,0 +1,78 @@
+.drummer-training-page { min-height: 100dvh; padding: max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: radial-gradient(circle at top, #251b18 0, #0a0c12 42%, #07080c 100%); color: #f6f7fb; }
+.training-page-header, .training-page-layout { width: min(1320px, 100%); margin-inline: auto; }
+.training-page-header { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18px; margin-bottom: 18px; }
+.training-page-header h1 { margin: 2px 0 4px; font-size: clamp(1.8rem, 4vw, 3rem); }
+.training-page-header p { margin: 0; color: #aeb6c8; }
+.training-page-nav { display: flex; flex-direction: column; gap: 7px; }
+.training-page-layout { display: grid; grid-template-columns: minmax(320px, .72fr) minmax(520px, 1.28fr); gap: 16px; align-items: start; }
+.training-stage { position: sticky; top: 14px; min-height: 610px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden; }
+.training-quick-settings, .drummer-training-suite { grid-column: 2; }
+.training-orbit { position: relative; width: min(48vw, 250px); aspect-ratio: 1; display: grid; place-content: center; border: 2px solid var(--accent); border-radius: 50%; background: radial-gradient(circle, rgba(255,106,61,.26), rgba(25,29,42,.88) 68%); box-shadow: 0 0 70px rgba(255,106,61,.18), inset 0 0 28px rgba(255,106,61,.16); overflow: visible; }
+.training-orbit > strong { font-size: clamp(4rem, 12vw, 7rem); line-height: .9; font-variant-numeric: tabular-nums; }
+.training-orbit > span { margin-top: 15px; max-width: 190px; color: #c6cedc; font-size: .74rem; letter-spacing: .05em; }
+.accent-flash-wave { position: absolute; inset: -2px; border: 3px solid #fff3c4; border-radius: 50%; pointer-events: none; animation: accent-flash-wave .42s ease-out both; }
+@keyframes accent-flash-wave { 0% { transform: scale(.82); opacity: 1; box-shadow: 0 0 0 0 rgba(255,211,98,.78), inset 0 0 70px rgba(255,211,98,.62); } 100% { transform: scale(1.35); opacity: 0; box-shadow: 0 0 0 44px rgba(255,211,98,0); } }
+.training-bpm-row { display: grid; grid-template-columns: 52px minmax(145px, 220px) 52px; gap: 10px; align-items: center; margin: 25px 0 15px; }
+.training-bpm-row > button { min-height: 52px; border-radius: 14px; font-size: 1.6rem; }
+.training-bpm-row > div input { width: 100%; border: 0; background: transparent; color: white; text-align: center; font-size: clamp(2.8rem, 7vw, 4.8rem); font-weight: 900; line-height: 1; }
+.training-bpm-row > div span { display: block; margin-top: 4px; color: #aeb6c8; font-size: .72rem; letter-spacing: .16em; }
+.training-measure-guide { width: min(100%, 560px); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 7px; border-radius: 13px; background: rgba(8,10,16,.72); }
+.training-measure-guide > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; padding: 5px; border: 1px solid #303746; border-radius: 9px; background: #11151e; }
+.training-measure-guide > div.active-beat { border-color: rgba(255,106,61,.7); background: rgba(255,106,61,.08); }
+.training-measure-guide span { min-width: 0; min-height: 36px; display: grid; place-items: center; border-radius: 7px; color: #7e889b; font: 800 .78rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+.training-measure-guide span.active { background: #55dea5; color: #07100c; transform: scale(1.08); box-shadow: 0 0 16px rgba(85,222,165,.38); }
+.training-primary-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.training-primary-actions button { min-width: 150px; min-height: 50px; }
+.training-primary-actions span { color: var(--text-muted); font-size: .8rem; }
+.training-quick-settings { min-width: 0; }
+.flash-toggle-card { min-height: 68px; display: flex !important; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #151923; }
+.flash-toggle-card input { width: 22px; height: 22px; }
+.mode-launcher-group { position: fixed; z-index: 75; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+.mode-launcher-group .mode-launcher { position: static; min-height: 46px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; background: #171b25; color: white; box-shadow: 0 10px 30px rgba(0,0,0,.35); font-weight: 850; }
+.mode-launcher-group .mode-launcher.training { background: #8b442d; border-color: #a95637; }
+.metronome-page-nav { display: flex; flex-direction: column; gap: 7px; }
+.beat-orbit { position: relative; overflow: visible; }
+.metronome-flash { inset: -4px; }
+
+@media (max-width: 900px) {
+  .training-page-header { grid-template-columns: 1fr auto; }
+  .training-page-nav { grid-column: 1 / -1; flex-direction: row; }
+  .training-page-layout { grid-template-columns: 1fr; }
+  .training-stage { position: relative; top: auto; min-height: auto; padding-block: 28px; }
+  .training-quick-settings, .drummer-training-suite { grid-column: 1; }
+}
+
+@media (max-width: 700px) {
+  .mode-launcher-group { left: 8px; right: 8px; bottom: calc(66px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; }
+  .mode-launcher-group .mode-launcher { min-width: 0; padding-inline: 10px; font-size: .78rem; }
+  .metronome-page-nav { flex-direction: row; }
+}
+
+@media (max-width: 520px) {
+  .drummer-training-page { padding-inline: max(9px, env(safe-area-inset-left)); }
+  .training-page-header { gap: 11px; }
+  .training-page-header p { font-size: .78rem; }
+  .training-page-nav { display: grid; grid-template-columns: 1fr 1fr; }
+  .training-orbit { width: min(62vw, 220px); }
+  .training-bpm-row { grid-template-columns: 46px minmax(120px, 190px) 46px; }
+  .training-measure-guide { gap: 3px; padding: 5px; }
+  .training-measure-guide > div { gap: 1px; padding: 3px; }
+  .training-measure-guide span { min-height: 32px; font-size: .66rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accent-flash-wave { animation: none; opacity: .45; }
+}
+
+
+.mode-launcher-group { position: fixed; z-index: 75; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+.mode-launcher-group .mode-launcher { position: static; min-height: 46px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; background: #171b25; color: white; box-shadow: 0 10px 30px rgba(0,0,0,.35); font-weight: 850; }
+.mode-launcher-group .mode-launcher.training { background: #8b442d; border-color: #a95637; }
+.metronome-page-nav { display: flex; flex-direction: column; gap: 7px; }
+.beat-orbit { position: relative; overflow: visible; }
+.metronome-flash { inset: -4px; }
+@media (max-width: 700px) {
+  .mode-launcher-group { left: 8px; right: 8px; bottom: calc(66px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; }
+  .mode-launcher-group .mode-launcher { min-width: 0; padding-inline: 10px; font-size: .78rem; }
+  .metronome-page-nav { flex-direction: row; }
+}

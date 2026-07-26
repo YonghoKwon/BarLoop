@@ -3,15 +3,21 @@ import App from './App';
 import AppUtilities from './components/AppUtilities';
 import MetronomeAudioRecovery from './components/MetronomeAudioRecovery';
 import PracticeCoach from './components/PracticeCoach';
-import MetronomeLabPage from './pages/MetronomeLabPage';
+import DrummerTrainingPage from './pages/DrummerTrainingPage';
+import MetronomePage from './pages/MetronomePage';
 
-function readRoute(): 'practice' | 'metronome' {
-  return window.location.hash.replace(/^#\/?/, '') === 'metronome' ? 'metronome' : 'practice';
+type AppRoute = 'practice' | 'metronome' | 'drummer-training';
+
+function readRoute(): AppRoute {
+  const route = window.location.hash.replace(/^#\/?/, '');
+  if (route === 'metronome') return 'metronome';
+  if (route === 'drummer-training' || route === 'training') return 'drummer-training';
+  return 'practice';
 }
 
 export default function AdvancedApp() {
   const [landscapePractice, setLandscapePractice] = useState(false);
-  const [route, setRoute] = useState(readRoute);
+  const [route, setRoute] = useState<AppRoute>(readRoute);
 
   useEffect(() => {
     const handleHashChange = () => setRoute(readRoute());
@@ -39,7 +45,16 @@ export default function AdvancedApp() {
   if (route === 'metronome') {
     return (
       <>
-        <MetronomeLabPage />
+        <MetronomePage />
+        <MetronomeAudioRecovery />
+      </>
+    );
+  }
+
+  if (route === 'drummer-training') {
+    return (
+      <>
+        <DrummerTrainingPage />
         <MetronomeAudioRecovery />
       </>
     );
@@ -48,9 +63,14 @@ export default function AdvancedApp() {
   return (
     <>
       <App />
-      <button type="button" className="mode-launcher" onClick={() => { window.location.hash = 'metronome'; }}>
-        메트로놈 전용 연습
-      </button>
+      <nav className="mode-launcher-group" aria-label="독립 연습 페이지">
+        <button type="button" className="mode-launcher" onClick={() => { window.location.hash = 'metronome'; }}>
+          메트로놈
+        </button>
+        <button type="button" className="mode-launcher training" onClick={() => { window.location.hash = 'drummer-training'; }}>
+          드럼 트레이닝
+        </button>
+      </nav>
       <PracticeCoach />
       <AppUtilities />
       <MetronomeAudioRecovery />

@@ -210,6 +210,7 @@ function App() {
   const [bpmInput, setBpmInput] = useState(String(initialSettingsRef.current.bpm));
   const [beatsPerBar, setBeatsPerBar] = useState(initialSettingsRef.current.beatsPerBar);
   const [firstDownbeat, setFirstDownbeat] = useState(0);
+  const [firstDownbeatInput, setFirstDownbeatInput] = useState('0.00');
   const [bars, setBars] = useState<BarSegment[]>([]);
   const [selectedBarStart, setSelectedBarStart] = useState(0);
   const [selectedBarEnd, setSelectedBarEnd] = useState(0);
@@ -700,6 +701,21 @@ function App() {
     setNotice('');
   };
 
+  const setDownbeatValue = (value: number) => {
+    const safe = clamp(Number.isFinite(value) ? value : 0, 0, duration > 0 ? duration : Number.MAX_SAFE_INTEGER);
+    setFirstDownbeat(safe);
+    setFirstDownbeatInput(safe.toFixed(2));
+  };
+
+  const commitDownbeatInput = () => {
+    if (!firstDownbeatInput.trim()) {
+      setFirstDownbeatInput(firstDownbeat.toFixed(2));
+      return;
+    }
+    const parsed = Number(firstDownbeatInput.replace(',', '.'));
+    setDownbeatValue(Number.isFinite(parsed) ? parsed : firstDownbeat);
+  };
+
   const resetPlaybackState = useCallback(() => {
     countInSequenceRef.current += 1;
     metronomeRef.current.stopAll();
@@ -737,6 +753,7 @@ function App() {
     setTimeLoopStart(0);
     setTimeLoopEnd(Math.min(8, safeDuration));
     setFirstDownbeat(0);
+    setFirstDownbeatInput('0.00');
     setBars([]);
     setLoopCount(0);
     loopCountRef.current = 0;
@@ -812,7 +829,7 @@ function App() {
     setTapCount(times.length);
 
     if (times.length === 1 && isReady) {
-      setFirstDownbeat(mediaNow);
+      setDownbeatValue(mediaNow);
       setNotice(`첫 탭 ${formatTime(mediaNow, true)}을 다운비트로 지정했습니다. 같은 박으로 계속 탭해 주세요.`);
       setError('');
       return;
@@ -824,7 +841,7 @@ function App() {
       const tappedBpm = clamp(Math.round(60000 / average), 20, 400);
       const tappedDownbeat = mediaTimes[0] ?? mediaNow;
       setBpmInput(String(tappedBpm));
-      if (isReady) setFirstDownbeat(tappedDownbeat);
+      if (isReady) setDownbeatValue(tappedDownbeat);
 
       if (times.length >= 4 && isReady && duration > 0) {
         const nextBars = generateBars(duration, tappedBpm, beatsPerBar, tappedDownbeat);
@@ -944,6 +961,7 @@ function App() {
     setSyncOffsetMs(0);
     setGapEnabled(false);
     setFirstDownbeat(0);
+    setFirstDownbeatInput('0.00');
     setBars([]);
     setTimeLoopStart(0);
     setTimeLoopEnd(Math.min(8, duration || 8));
@@ -1046,7 +1064,7 @@ function App() {
                 <div className="field"><label htmlFor="beats">한 마디 박자</label><select id="beats" value={beatsPerBar} onChange={(event) => setBeatsPerBar(Number(event.target.value))}>{[2, 3, 4, 5, 6, 7, 8, 12].map((value) => <option key={value} value={value}>{value}박</option>)}</select></div>
               </div>
               <div className="tap-tempo-row"><button type="button" className="secondary-button" onClick={tapTempo}>박자 맞춤 탭</button><div><strong>첫 탭 = 첫 박</strong><span>{tapCount > 0 ? `${tapCount}회 입력 · 4회부터 마디 미리 생성` : '영상의 첫 박부터 4회 이상 탭'}</span></div></div>
-              <div className="field"><div className="label-row"><label htmlFor="downbeat">첫 다운비트</label><button type="button" className="text-button" disabled={!isReady} onClick={() => setFirstDownbeat(currentTime)}>현재 위치</button></div><div className="stepper-row"><button type="button" disabled={!isReady} onClick={() => setFirstDownbeat((value) => clamp(value - 0.05, 0, duration))}>−0.05</button><input id="downbeat" type="number" min={0} max={duration || undefined} step={0.01} value={Number(firstDownbeat.toFixed(2))} onChange={(event) => setFirstDownbeat(clamp(Number(event.target.value), 0, duration || 0))} /><button type="button" disabled={!isReady} onClick={() => setFirstDownbeat((value) => clamp(value + 0.05, 0, duration))}>+0.05</button><button type="button" disabled={!isReady} onClick={() => seekTo(firstDownbeat)}>이동</button></div></div>
+              <div className="field"><div className="label-row"><label htmlFor="downbeat">첫 다운비트</label><button type="button" className="text-button" disabled={!isReady} onClick={() => setDownbeatValue(currentTime)}>현재 위치</button></div><div className="stepper-row"><button type="button" disabled={!isReady} onClick={() => setDownbeatValue(firstDownbeat - 0.05)}>−0.05</button><input id="downbeat" type="text" inputMode="decimal" value={firstDownbeatInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setFirstDownbeatInput(event.target.value.replace(',', '.').replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} onBlur={commitDownbeatInput} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /><button type="button" disabled={!isReady} onClick={() => setDownbeatValue(firstDownbeat + 0.05)}>+0.05</button><button type="button" disabled={!isReady} onClick={() => { commitDownbeatInput(); seekTo(firstDownbeat); }}>이동</button></div></div>
               <button type="button" className="primary-button full-width" disabled={!isReady} onClick={generateBarSegments}>마디 나누기</button>
             </section>
 

@@ -9,8 +9,9 @@ import './ios-responsive.css';
 import './ios-overflow-fix.css';
 import './full-bar-guide.css';
 import './drummer-training.css';
+import './drummer-training-page.css';
 
-// Load every training stylesheet before booting the PWA on mobile Safari.
+// Keep the three practice surfaces and their mobile layouts in the same PWA bundle.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     void navigator.serviceWorker.register('./sw.js').catch(() => undefined);
