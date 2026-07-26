@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BpmNumberInput from '../components/BpmNumberInput';
 import { preparePlaybackAudioSession, releasePlaybackAudioSession } from '../lib/audioPlaybackSession';
 import { clampBpm } from '../lib/bpm';
+import { buildSubdivisionCountGroups, getCurrentSubdivisionCount } from '../lib/subdivisionCount';
 import {
   isKoreanCountVoiceSupported,
   primeKoreanCountVoice,
@@ -319,6 +320,15 @@ export default function MetronomeLabPage() {
 
   const rudiment = RUDIMENTS[Math.min(RUDIMENTS.length - 1, Math.max(0, rudimentIndex))];
   const progress = timerMinutes > 0 ? Math.min(100, (elapsedSeconds / (timerMinutes * 60)) * 100) : 0;
+  const subdivisionCountGroups = useMemo(
+    () => buildSubdivisionCountGroups(beatsPerBar, subdivision),
+    [beatsPerBar, subdivision],
+  );
+  const currentSubdivisionCount = getCurrentSubdivisionCount(
+    beatInBar,
+    subdivisionInBeat,
+    subdivision,
+  );
 
   return (
     <div className="metronome-lab-page">
@@ -337,7 +347,7 @@ export default function MetronomeLabPage() {
       <main className="lab-layout">
         <section className="lab-stage panel">
           <div className={audible ? 'beat-orbit' : 'beat-orbit muted'}>
-            <div className="beat-number">{beatInBar + 1}</div>
+            <div className="beat-number current-count-position">{currentSubdivisionCount}</div>
             <span>{audible ? (countMode === 'voice' ? 'VOICE' : countMode === 'both' ? 'BOTH' : 'CLICK') : 'GAP'}</span>
           </div>
 
@@ -360,6 +370,37 @@ export default function MetronomeLabPage() {
               <i key={index} className={index === subdivisionInBeat ? 'active' : ''} />
             ))}
           </div>
+
+          <div className="subdivision-count-guide" aria-label="한 마디 서브디비전 카운트">
+            {subdivisionCountGroups.map((labels, countBeatIndex) => (
+              <div
+                key={countBeatIndex}
+                className={countBeatIndex === beatInBar ? 'count-beat-group active-beat' : 'count-beat-group'}
+              >
+                {labels.map((label, countSubdivisionIndex) => (
+                  <span
+                    key={`${countBeatIndex}-${countSubdivisionIndex}`}
+                    className={
+                      countBeatIndex === beatInBar && countSubdivisionIndex === subdivisionInBeat
+                        ? 'active'
+                        : ''
+                    }
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+          <p className="subdivision-count-hint">
+            {subdivision === 4
+              ? '16분음표: 1 e & a'
+              : subdivision === 3
+                ? '셋잇단: 1 trip let'
+                : subdivision === 2
+                  ? '8분음표: 1 &'
+                  : '4분음표: 1 2 3 4'}
+          </p>
 
           <div className="lab-primary-actions">
             <button id="metronome-toggle" type="button" className="primary-button" onClick={running ? stop : start}>

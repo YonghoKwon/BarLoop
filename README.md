@@ -37,6 +37,7 @@ YouTube, 로컬 영상 또는 음원을 마디·시간 구간으로 반복하고
 - 20~400 BPM, Tap Tempo, 자주 쓰는 BPM 프리셋
 - 2~12박자와 박별 사용자 악센트
 - 4분·8분·셋잇단·16분음표
+- 현재 서브디비전 시각 표시: `1 &`, `1 trip let`, `1 e & a`
 - Straight, Light Swing, Triplet Swing, Heavy Swing
 - Classic, Wood, Rim, Cowbell 클릭 음색
 - 기본 클릭·강세·서브디비전 개별 음량
