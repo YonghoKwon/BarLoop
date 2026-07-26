@@ -10,6 +10,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4173',
     trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
   webServer: {
     command: 'npm run dev -- --host 127.0.0.1 --port 4173',
@@ -22,8 +23,29 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     {
-      name: 'mobile-chromium',
-      use: { ...devices['Pixel 7'] },
+      name: 'iphone-15-pro-safari',
+      use: {
+        ...devices['iPhone 15 Pro'],
+        browserName: 'webkit',
+      },
+    },
+    {
+      name: 'ipad-air-4-safari',
+      use: {
+        ...devices['iPad (gen 7)'],
+        browserName: 'webkit',
+        viewport: { width: 820, height: 1180 },
+        screen: { width: 820, height: 1180 },
+      },
+    },
+    {
+      name: 'ipad-air-4-landscape-safari',
+      use: {
+        ...devices['iPad (gen 7) landscape'],
+        browserName: 'webkit',
+        viewport: { width: 1180, height: 820 },
+        screen: { width: 1180, height: 820 },
+      },
     },
   ],
 });
