@@ -43,6 +43,16 @@ jobs:
               "const safe = clamp(Number.isFinite(value) ? value : 0, 0, duration || 0);",
               "const safe = clamp(Number.isFinite(value) ? value : 0, 0, duration > 0 ? duration : Number.MAX_SAFE_INTEGER);",
           )
+          app = app.replace(
+              """if (!firstDownbeatInput.trim()) {
+      setFirstDownbeatInput(firstDownbeat.toFixed(2));
+      return;
+    }""",
+              """if (!firstDownbeatInput.trim()) {
+      setFirstDownbeat(0);
+      return;
+    }""",
+          )
           app_path.write_text(app, encoding='utf-8')
 
           metro_path = Path('src/pages/MetronomePage.tsx')
