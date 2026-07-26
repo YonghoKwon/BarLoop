@@ -3,6 +3,7 @@ export type DrumInstrument =
   | 'ride'
   | 'hihat'
   | 'rackTom'
+  | 'midTom'
   | 'floorTom'
   | 'snare'
   | 'kick';
@@ -19,7 +20,8 @@ export const DRUM_INSTRUMENTS: DrumInstrumentDefinition[] = [
   { id: 'crash', label: '크래시', short: 'CR', family: 'cymbal' },
   { id: 'ride', label: '라이드', short: 'RD', family: 'cymbal' },
   { id: 'hihat', label: '하이햇', short: 'HH', family: 'cymbal' },
-  { id: 'rackTom', label: '랙 탐', short: 'RT', family: 'drum' },
+  { id: 'rackTom', label: '스몰 탐', short: 'ST', family: 'drum' },
+  { id: 'midTom', label: '미들 탐', short: 'MT', family: 'drum' },
   { id: 'floorTom', label: '플로어 탐', short: 'FT', family: 'drum' },
   { id: 'snare', label: '스네어', short: 'SN', family: 'drum' },
   { id: 'kick', label: '킥', short: 'BD', family: 'drum' },
@@ -131,10 +133,19 @@ export const GROOVE_PATTERNS: DrumPattern[] = [
     snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2],
     kick: [2, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 0, 0, 1],
   }),
-  pattern('four-piece-fill', '4피스 탐 필인', '마지막 두 박을 랙 탐·플로어 탐·스네어·킥으로 이동하는 기본 필인입니다.', 0.5, {
+  pattern('four-piece-fill', '4피스 탐 필인', '4피스 기준 스몰 탐·플로어 탐·스네어·킥으로 이동하는 기본 필인입니다.', 0.5, {
     crash: [2],
     hihat: [0, 0, 1, 0, 1, 0, 1, 0],
     rackTom: [0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 1, 1],
+    floorTom: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1],
+    snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    kick: [2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+  }),
+  pattern('five-piece-fill', '5피스 탐 필인', '스몰 탐·미들 탐·플로어 탐을 순서대로 내려가는 5피스 필인입니다.', 0.5, {
+    crash: [2],
+    hihat: [0, 0, 1, 0, 1, 0, 1, 0],
+    rackTom: [0, 0, 0, 0, 0, 0, 0, 0, 2, 1],
+    midTom: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1],
     floorTom: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1],
     snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     kick: [2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2],
@@ -158,7 +169,7 @@ export const DEFAULT_CUSTOM_PATTERN: DrumPattern = clonePattern(
   'custom',
   '내 커스텀 패턴',
 );
-DEFAULT_CUSTOM_PATTERN.description = '2~12박 한 마디에서 4피스 드럼과 심벌의 각 16분 칸을 편집할 수 있습니다.';
+DEFAULT_CUSTOM_PATTERN.description = '2~12박 한 마디에서 4피스·5피스 드럼과 심벌의 각 16분 칸을 편집할 수 있습니다.';
 
 export const DEFAULT_ROUTINE: PracticeRoutineStep[] = [
   { id: 'warmup', name: '워밍업', bpm: 80, bars: 8, patternId: 'basic-rock', accentTrainer: false },

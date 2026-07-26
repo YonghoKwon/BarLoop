@@ -147,7 +147,7 @@ test('separates the metronome and drummer training pages', async ({ page }) => {
   await expect(page).toHaveURL(/#drummer-training/);
   await expect(page.getByRole('heading', { name: '드럼 트레이닝' })).toBeVisible();
   await expect(page.getByText('커스텀 16칸 시퀀서')).toBeVisible();
-  await expect(page.getByText('랙 탐', { exact: true })).toBeVisible();
+  await expect(page.getByText('스몰 탐', { exact: true })).toBeVisible();
   await expect(page.getByText('플로어 탐', { exact: true })).toBeVisible();
   await expect(page.getByText('라이드', { exact: true })).toBeVisible();
   await expect(page.getByText('크래시', { exact: true })).toBeVisible();

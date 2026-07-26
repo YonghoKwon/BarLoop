@@ -4,9 +4,9 @@ import {
   useMemo,
   useRef,
   useState,
-  type DragEvent,
-  type MouseEvent,
+  type DragEvent
 } from 'react';
+import BarRangePicker from './components/BarRangePicker';
 import LocalMediaPlayer from './components/LocalMediaPlayer';
 import MediaPracticePanel from './components/MediaPracticePanel';
 import MetronomePanel from './components/MetronomePanel';
@@ -28,6 +28,7 @@ import {
   type Subdivision,
 } from './lib/metronome';
 import { preparePlaybackAudioSession, releasePlaybackAudioSession } from './lib/audioPlaybackSession';
+import type { MetronomeSound } from './lib/standaloneMetronome';
 import {
   isKoreanCountVoiceSupported,
   primeKoreanCountVoice,
@@ -41,7 +42,9 @@ import { createWaveformPeaks } from './lib/waveform';
 import type { BarSegment, LoopMode, PlayerHandle, SourceType } from './types';
 
 const SPEEDS = [0.5, 0.65, 0.75, 0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.25, 1.5, 2];
-const SETTINGS_KEY = 'barloop:practice-settings:v3';
+const SETTINGS_KEY = 'barloop:practice-settings:v4';
+const LEGACY_SETTINGS_KEY = 'barloop:practice-settings:v3';
+const METRONOME_SOUNDS: MetronomeSound[] = ['classic', 'wood', 'rim', 'cowbell', 'digital', 'clave', 'shaker', 'low'];
 
 interface StoredSettings {
   bpm: number;
@@ -55,6 +58,10 @@ interface StoredSettings {
   countInBars: number;
   subdivision: Subdivision;
   metronomeVolume: number;
+  accentVolume: number;
+  subdivisionVolume: number;
+  metronomeSound: MetronomeSound;
+  accentSound: MetronomeSound;
   countMode: MediaCountMode;
   countInClickMode: CountInClickMode;
   syncOffsetMs: number;
@@ -92,6 +99,10 @@ const DEFAULT_SETTINGS: StoredSettings = {
   countInBars: 1,
   subdivision: 1,
   metronomeVolume: 0.55,
+  accentVolume: 0.82,
+  subdivisionVolume: 0.3,
+  metronomeSound: 'classic',
+  accentSound: 'wood',
   countMode: 'click',
   countInClickMode: 'beat',
   syncOffsetMs: 0,
@@ -113,7 +124,7 @@ const DEFAULT_TRAINER: TempoTrainerSettings = {
 function readStoredSettings(): StoredSettings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS;
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || '{}') as Partial<StoredSettings>;
+    const parsed = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || window.localStorage.getItem(LEGACY_SETTINGS_KEY) || '{}') as Partial<StoredSettings>;
     const midiMappings = parsed.midiMappings ?? DEFAULT_MIDI_MAPPINGS;
     return {
       bpm: clamp(Math.round(Number(parsed.bpm) || DEFAULT_SETTINGS.bpm), 20, 400),
@@ -133,6 +144,10 @@ function readStoredSettings(): StoredSettings {
         ? (Number(parsed.subdivision) as Subdivision)
         : 1,
       metronomeVolume: clamp(Number(parsed.metronomeVolume) || 0.55, 0.05, 1),
+      accentVolume: clamp(Number(parsed.accentVolume) || 0.82, 0.05, 1),
+      subdivisionVolume: clamp(Number(parsed.subdivisionVolume) || 0.3, 0, 1),
+      metronomeSound: METRONOME_SOUNDS.includes(parsed.metronomeSound as MetronomeSound) ? parsed.metronomeSound as MetronomeSound : 'classic',
+      accentSound: METRONOME_SOUNDS.includes(parsed.accentSound as MetronomeSound) ? parsed.accentSound as MetronomeSound : 'wood',
       countMode: ['click', 'voice', 'both'].includes(String(parsed.countMode))
         ? (String(parsed.countMode) as MediaCountMode)
         : 'click',
@@ -226,6 +241,10 @@ function App() {
   const [countInBars, setCountInBars] = useState(initialSettingsRef.current.countInBars);
   const [subdivision, setSubdivision] = useState<Subdivision>(initialSettingsRef.current.subdivision);
   const [metronomeVolume, setMetronomeVolume] = useState(initialSettingsRef.current.metronomeVolume);
+  const [accentVolume, setAccentVolume] = useState(initialSettingsRef.current.accentVolume);
+  const [subdivisionVolume, setSubdivisionVolume] = useState(initialSettingsRef.current.subdivisionVolume);
+  const [metronomeSound, setMetronomeSound] = useState<MetronomeSound>(initialSettingsRef.current.metronomeSound);
+  const [accentSound, setAccentSound] = useState<MetronomeSound>(initialSettingsRef.current.accentSound);
   const [countMode, setCountMode] = useState<MediaCountMode>(initialSettingsRef.current.countMode);
   const [countInClickMode, setCountInClickMode] = useState<CountInClickMode>(initialSettingsRef.current.countInClickMode);
   const [syncOffsetMs, setSyncOffsetMs] = useState(initialSettingsRef.current.syncOffsetMs);
@@ -272,6 +291,8 @@ function App() {
     };
   }, [bars, selectedBarEnd, selectedBarStart]);
 
+
+
   const activeLoop = useMemo(() => {
     if (loopMode === 'bars' && selectedBars) return { start: selectedBars.start, end: selectedBars.end };
     return {
@@ -280,12 +301,6 @@ function App() {
     };
   }, [duration, loopMode, selectedBars, timeLoopEnd, timeLoopStart]);
 
-  const visibleBars = useMemo(() => {
-    if (bars.length <= 60) return bars;
-    const center = selectedBars?.startIndex ?? 0;
-    const start = Math.max(0, center - 24);
-    return bars.slice(start, Math.min(bars.length, start + 49));
-  }, [bars, selectedBars?.startIndex]);
 
   const storedSettings = useMemo<StoredSettings>(() => ({
     bpm: Number.isFinite(bpm) && bpm > 0 ? bpm : DEFAULT_SETTINGS.bpm,
@@ -299,6 +314,10 @@ function App() {
     countInBars,
     subdivision,
     metronomeVolume,
+    accentVolume,
+    subdivisionVolume,
+    metronomeSound,
+    accentSound,
     countMode,
     countInClickMode,
     syncOffsetMs,
@@ -307,6 +326,8 @@ function App() {
     gapMuteBars,
     midiMappings,
   }), [
+    accentSound,
+    accentVolume,
     beatsPerBar,
     bpm,
     countInBars,
@@ -318,6 +339,8 @@ function App() {
     loopEnabled,
     metronomeEnabled,
     metronomeVolume,
+    subdivisionVolume,
+    metronomeSound,
     midiMappings,
     mediaVolume,
     playbackRate,
@@ -405,6 +428,13 @@ function App() {
     onLoop: handleLoop,
   });
 
+  const currentBarIndex = useMemo(() => {
+    if (bars.length === 0) return -1;
+    const found = bars.findIndex((bar) => currentTime >= bar.start && currentTime < bar.end);
+    if (found >= 0) return found;
+    return currentTime >= bars[bars.length - 1].end ? bars.length - 1 : -1;
+  }, [bars, currentTime]);
+
   const seekTo = useCallback((seconds: number) => {
     const safeTime = clamp(seconds, 0, duration || 0);
     playerRef.current?.seekTo(safeTime);
@@ -460,6 +490,10 @@ function App() {
     beatsPerBar,
     subdivision,
     volume: metronomeVolume,
+    accentVolume,
+    subdivisionVolume,
+    sound: metronomeSound,
+    accentSound,
     playbackRate,
     firstDownbeat,
     syncOffsetMs,
@@ -474,7 +508,9 @@ function App() {
     gapEnabled,
     gapMuteBars,
     gapPlayBars,
+    metronomeSound,
     metronomeVolume,
+    subdivisionVolume,
     outputHasClick,
     playbackRate,
     subdivision,
@@ -525,6 +561,10 @@ function App() {
           beatsPerBar,
           bars: countInBars,
           volume: metronomeVolume,
+          accentVolume,
+          subdivisionVolume,
+          sound: metronomeSound,
+          accentSound,
           subdivision,
           clickMode: countInClickMode,
           clickEnabled: outputHasClick,
@@ -551,9 +591,13 @@ function App() {
     bpm,
     countInBars,
     countInClickMode,
+    accentSound,
+    accentVolume,
     isPlaying,
     isReady,
+    metronomeSound,
     metronomeVolume,
+    subdivisionVolume,
     outputHasClick,
     outputHasVoice,
     playbackRate,
@@ -876,17 +920,6 @@ function App() {
     if (nextBars[0]) seekTo(nextBars[0].start);
   };
 
-  const selectBar = (index: number, event: MouseEvent<HTMLButtonElement>) => {
-    if (event.shiftKey && selectedBars) {
-      setSelectedBarStart(Math.min(selectedBars.startIndex, index));
-      setSelectedBarEnd(Math.max(selectedBars.startIndex, index));
-    } else {
-      setSelectedBarStart(index);
-      setSelectedBarEnd(index);
-    }
-    setLoopMode('bars');
-    seekTo(bars[index].start);
-  };
 
   const setTimeBoundary = (boundary: 'start' | 'end', value: number) => {
     const safe = clamp(value, 0, duration);
@@ -954,6 +987,11 @@ function App() {
     setMediaVolume(0.85);
     setPreRollBeats(beatsPerBar);
     setMetronomeEnabled(false);
+    setMetronomeVolume(DEFAULT_SETTINGS.metronomeVolume);
+    setAccentVolume(DEFAULT_SETTINGS.accentVolume);
+    setSubdivisionVolume(DEFAULT_SETTINGS.subdivisionVolume);
+    setMetronomeSound(DEFAULT_SETTINGS.metronomeSound);
+    setAccentSound(DEFAULT_SETTINGS.accentSound);
     setCountInBars(1);
     setSubdivision(1);
     setCountMode('click');
@@ -1039,6 +1077,8 @@ function App() {
               </div>
             </div>
 
+            <div className="now-playing-bar-inline" role="status"><span>현재 연주 위치</span><strong>{currentBarIndex >= 0 ? `${currentBarIndex + 1}마디` : '마디 밖'}</strong>{selectedBars && <span>반복 {selectedBars.startIndex + 1}–{selectedBars.endIndex + 1}마디</span>}</div>
+
             <div className="transport-row sticky-mobile-controls">
               <button type="button" className="icon-button" disabled={!isReady} onClick={() => seekTo(currentTime - 5)}>−5초</button>
               <button type="button" className="fine-button" disabled={!isReady} onClick={() => seekTo(currentTime - 0.1)}>−0.1</button>
@@ -1070,14 +1110,16 @@ function App() {
 
             <section className="panel loop-panel">
               <div className="section-title-row"><div><span className="eyebrow">STEP 2</span><h2>반복 구간</h2></div><div className="mode-tabs"><button type="button" className={loopMode === 'bars' ? 'active' : ''} onClick={() => setLoopMode('bars')}>마디</button><button type="button" className={loopMode === 'time' ? 'active' : ''} onClick={() => setLoopMode('time')}>시간</button></div></div>
-              {loopMode === 'bars' ? bars.length > 0 && selectedBars ? <><div className="bar-range-controls"><button type="button" onClick={() => moveBarSelection(-1)}>← 이전</button><div><strong>{selectedBars.startIndex + 1}{selectedBars.endIndex > selectedBars.startIndex ? `–${selectedBars.endIndex + 1}` : ''}마디</strong><span>{formatTime(selectedBars.start, true)}–{formatTime(selectedBars.end, true)}</span></div><button type="button" onClick={() => moveBarSelection(1)}>다음 →</button></div><div className="bar-select-row"><label>시작<select value={selectedBars.startIndex} onChange={(event) => { const next = Number(event.target.value); setSelectedBarStart(next); setSelectedBarEnd((end) => Math.max(end, next)); seekTo(bars[next].start); }}>{bars.map((bar) => <option key={bar.index} value={bar.index}>{bar.index + 1}</option>)}</select></label><label>종료<select value={selectedBars.endIndex} onChange={(event) => setSelectedBarEnd(Number(event.target.value))}>{bars.slice(selectedBars.startIndex).map((bar) => <option key={bar.index} value={bar.index}>{bar.index + 1}</option>)}</select></label></div><div className="bar-grid">{visibleBars.map((bar) => { const active = bar.index >= selectedBars.startIndex && bar.index <= selectedBars.endIndex; return <button type="button" key={bar.index} className={active ? 'bar-button active' : 'bar-button'} onClick={(event) => selectBar(bar.index, event)}><strong>{bar.index + 1}</strong><span>{formatTime(bar.start)}</span></button>; })}</div>{visibleBars.length < bars.length && <p className="hint">성능을 위해 선택 구간 주변 마디만 표시합니다. 시작·종료 선택창에는 전체 마디가 있습니다.</p>}</> : <div className="empty-control">BPM과 첫 다운비트를 맞춘 뒤 마디를 나눠 주세요.</div> : <div className="time-loop-controls"><div className="time-boundary"><div><span>A · 시작</span><strong>{formatTime(timeLoopStart, true)}</strong></div><div className="boundary-actions"><button type="button" disabled={!isReady} onClick={() => setTimeBoundary('start', currentTime)}>현재 위치</button><input type="number" min={0} max={duration} step={0.01} value={Number(timeLoopStart.toFixed(2))} onChange={(event) => setTimeBoundary('start', Number(event.target.value))} /></div></div><div className="time-boundary"><div><span>B · 종료</span><strong>{formatTime(timeLoopEnd, true)}</strong></div><div className="boundary-actions"><button type="button" disabled={!isReady} onClick={() => setTimeBoundary('end', currentTime)}>현재 위치</button><input type="number" min={0} max={duration} step={0.01} value={Number(timeLoopEnd.toFixed(2))} onChange={(event) => setTimeBoundary('end', Number(event.target.value))} /></div></div><button type="button" className="secondary-button full-width" disabled={!isReady} onClick={restartLoop}>A 지점부터</button></div>}
+              {loopMode === 'bars' ? bars.length > 0 && selectedBars ? (
+                <BarRangePicker bars={bars} startIndex={selectedBars.startIndex} endIndex={selectedBars.endIndex} currentBarIndex={currentBarIndex} onStartChange={(index) => { setSelectedBarStart(index); setSelectedBarEnd((end) => Math.max(end, index)); }} onEndChange={(index) => setSelectedBarEnd(Math.max(selectedBars.startIndex, index))} onSeek={seekTo} onMoveRange={moveBarSelection} />
+              ) : <div className="empty-control">BPM과 첫 다운비트를 맞춘 뒤 마디를 나눠 주세요.</div> : <div className="time-loop-controls"><div className="time-boundary"><div><span>A · 시작</span><strong>{formatTime(timeLoopStart, true)}</strong></div><div className="boundary-actions"><button type="button" disabled={!isReady} onClick={() => setTimeBoundary('start', currentTime)}>현재 위치</button><input type="number" min={0} max={duration} step={0.01} value={Number(timeLoopStart.toFixed(2))} onChange={(event) => setTimeBoundary('start', Number(event.target.value))} /></div></div><div className="time-boundary"><div><span>B · 종료</span><strong>{formatTime(timeLoopEnd, true)}</strong></div><div className="boundary-actions"><button type="button" disabled={!isReady} onClick={() => setTimeBoundary('end', currentTime)}>현재 위치</button><input type="number" min={0} max={duration} step={0.01} value={Number(timeLoopEnd.toFixed(2))} onChange={(event) => setTimeBoundary('end', Number(event.target.value))} /></div></div><button type="button" className="secondary-button full-width" disabled={!isReady} onClick={restartLoop}>A 지점부터</button></div>}
             </section>
           </aside>
         </div>
 
         <div className="tools-grid">
           <MediaPracticePanel mediaVolume={mediaVolume} onMediaVolumeChange={setMediaVolume} preRollBeats={preRollBeats} onPreRollBeatsChange={setPreRollBeats} beatsPerBar={beatsPerBar} bpm={Number.isFinite(bpm) ? bpm : 120} disabled={!isReady} canUseBars={bars.length >= 4} onPlayPreRoll={() => void playFromPreRoll()} onFillPreset={applyFillPreset} />
-          <MetronomePanel enabled={metronomeEnabled} onEnabledChange={setMetronomeEnabled} countInBars={countInBars} onCountInBarsChange={setCountInBars} subdivision={subdivision} onSubdivisionChange={setSubdivision} volume={metronomeVolume} onVolumeChange={setMetronomeVolume} countMode={countMode} onCountModeChange={setCountMode} countInClickMode={countInClickMode} onCountInClickModeChange={setCountInClickMode} syncOffsetMs={syncOffsetMs} onSyncOffsetMsChange={(value) => setSyncOffsetMs(clamp(Math.round(value), -200, 200))} gapEnabled={gapEnabled} onGapEnabledChange={setGapEnabled} gapPlayBars={gapPlayBars} gapMuteBars={gapMuteBars} onGapPlayBarsChange={(value) => setGapPlayBars(clamp(Math.round(value), 1, 16))} onGapMuteBarsChange={(value) => setGapMuteBars(clamp(Math.round(value), 1, 16))} beatInBar={beatInBar} subdivisionInBeat={subdivisionInBeat} beatsPerBar={beatsPerBar} audibleBeat={audibleBeat} countInRemaining={countInRemaining} />
+          <MetronomePanel enabled={metronomeEnabled} onEnabledChange={setMetronomeEnabled} countInBars={countInBars} onCountInBarsChange={setCountInBars} subdivision={subdivision} onSubdivisionChange={setSubdivision} volume={metronomeVolume} onVolumeChange={setMetronomeVolume} accentVolume={accentVolume} onAccentVolumeChange={setAccentVolume} subdivisionVolume={subdivisionVolume} onSubdivisionVolumeChange={setSubdivisionVolume} sound={metronomeSound} onSoundChange={setMetronomeSound} accentSound={accentSound} onAccentSoundChange={setAccentSound} countMode={countMode} onCountModeChange={setCountMode} countInClickMode={countInClickMode} onCountInClickModeChange={setCountInClickMode} syncOffsetMs={syncOffsetMs} onSyncOffsetMsChange={(value) => setSyncOffsetMs(clamp(Math.round(value), -200, 200))} gapEnabled={gapEnabled} onGapEnabledChange={setGapEnabled} gapPlayBars={gapPlayBars} gapMuteBars={gapMuteBars} onGapPlayBarsChange={(value) => setGapPlayBars(clamp(Math.round(value), 1, 16))} onGapMuteBarsChange={(value) => setGapMuteBars(clamp(Math.round(value), 1, 16))} beatInBar={beatInBar} subdivisionInBeat={subdivisionInBeat} beatsPerBar={beatsPerBar} audibleBeat={audibleBeat} countInRemaining={countInRemaining} onTestClick={() => void metronomeRef.current.testClick(false)} onTestAccent={() => void metronomeRef.current.testClick(true)} />
           <TempoTrainerPanel settings={trainerSettings} currentBpm={trainerCurrentBpm} baseBpm={Number.isFinite(bpm) ? bpm : 120} active={trainerActive} onChange={setTrainerSettings} onStart={startTrainer} onStop={stopTrainer} />
           <SectionPresetPanel mediaKey={mediaKey} sections={sections} currentStart={activeLoop.start} currentEnd={activeLoop.end} bpm={Number.isFinite(bpm) ? bpm : 120} playbackRate={playbackRate} disabled={!isReady} onSectionsChange={setSections} onLoad={loadSection} onNotice={(message) => { setNotice(message); setError(''); }} onError={(message) => { setError(message); setNotice(''); }} />
           <MidiControlPanel supported={midi.supported} enabled={midi.enabled} connectedInputs={midi.connectedInputs} lastNote={midi.lastNote} error={midi.error} mappings={midiMappings} onMappingsChange={setMidiMappings} onEnable={() => void midi.enable()} onDisable={midi.disable} />
@@ -1089,7 +1131,7 @@ function App() {
 
       <footer><p>로컬 파일과 연습 데이터는 서버로 전송되지 않습니다. 브라우저 호환 코덱과 기기 성능에 따라 동작이 달라질 수 있습니다.</p></footer>
 
-      <PracticeModeOverlay visible={practiceMode} isPlaying={isPlaying} bpm={Number.isFinite(bpm) ? bpm : 120} playbackRate={playbackRate} currentTime={currentTime} loopStart={activeLoop.start} loopEnd={activeLoop.end} loopCount={loopCount} currentBeat={beatInBar} subdivisionInBeat={subdivisionInBeat} subdivision={subdivision} beatsPerBar={beatsPerBar} metronomeEnabled={metronomeEnabled} countMode={countMode} audibleBeat={audibleBeat} countInRemaining={countInRemaining} wakeLockActive={wakeLock.active} onClose={() => void closePracticeMode()} onTogglePlayback={() => void togglePlayback()} onPrevious={() => moveBarSelection(-1)} onRestart={restartLoop} onNext={() => moveBarSelection(1)} onToggleWakeLock={() => { if (wakeLock.active) void wakeLock.release(); else void wakeLock.request(); }} />
+      <PracticeModeOverlay visible={practiceMode} isPlaying={isPlaying} bpm={Number.isFinite(bpm) ? bpm : 120} playbackRate={playbackRate} currentTime={currentTime} loopStart={activeLoop.start} loopEnd={activeLoop.end} loopCount={loopCount} currentBeat={beatInBar} subdivisionInBeat={subdivisionInBeat} subdivision={subdivision} beatsPerBar={beatsPerBar} metronomeEnabled={metronomeEnabled} countMode={countMode} audibleBeat={audibleBeat} countInRemaining={countInRemaining} wakeLockActive={wakeLock.active} currentBarIndex={currentBarIndex} totalBars={bars.length} selectedBarStart={selectedBars?.startIndex ?? 0} selectedBarEnd={selectedBars?.endIndex ?? 0} onClose={() => void closePracticeMode()} onTogglePlayback={() => void togglePlayback()} onPrevious={() => moveBarSelection(-1)} onRestart={restartLoop} onNext={() => moveBarSelection(1)} onToggleWakeLock={() => { if (wakeLock.active) void wakeLock.release(); else void wakeLock.request(); }} />
     </div>
   );
 }
