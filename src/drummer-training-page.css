@@ -27,6 +27,12 @@
 .training-quick-settings { min-width: 0; }
 .flash-toggle-card { min-height: 68px; display: flex !important; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #151923; }
 .flash-toggle-card input { width: 22px; height: 22px; }
+.mode-launcher-group { position: fixed; z-index: 75; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+.mode-launcher-group .mode-launcher { position: static; min-height: 46px; padding: 0 16px; border: 1px solid var(--border); border-radius: 999px; background: #171b25; color: white; box-shadow: 0 10px 30px rgba(0,0,0,.35); font-weight: 850; }
+.mode-launcher-group .mode-launcher.training { background: #8b442d; border-color: #a95637; }
+.metronome-page-nav { display: flex; flex-direction: column; gap: 7px; }
+.beat-orbit { position: relative; overflow: visible; }
+.metronome-flash { inset: -4px; }
 
 @media (max-width: 900px) {
   .training-page-header { grid-template-columns: 1fr auto; }
@@ -34,6 +40,12 @@
   .training-page-layout { grid-template-columns: 1fr; }
   .training-stage { position: relative; top: auto; min-height: auto; padding-block: 28px; }
   .training-quick-settings, .drummer-training-suite { grid-column: 1; }
+}
+
+@media (max-width: 700px) {
+  .mode-launcher-group { left: 8px; right: 8px; bottom: calc(66px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 1fr; }
+  .mode-launcher-group .mode-launcher { min-width: 0; padding-inline: 10px; font-size: .78rem; }
+  .metronome-page-nav { flex-direction: row; }
 }
 
 @media (max-width: 520px) {
