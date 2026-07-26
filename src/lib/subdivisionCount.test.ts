@@ -3,6 +3,9 @@ import {
   buildSubdivisionCountGroups,
   getCurrentSubdivisionCount,
   getSubdivisionCountGroup,
+  getVisualSubdivision,
+  getVisualSubdivisionIndex,
+  isSubdivisionSoundCell,
 } from './subdivisionCount';
 
 describe('subdivision count labels', () => {
@@ -24,5 +27,34 @@ describe('subdivision count labels', () => {
     expect(getCurrentSubdivisionCount(2, 1, 4)).toBe('3 e');
     expect(getCurrentSubdivisionCount(2, 2, 4)).toBe('3 &');
     expect(getCurrentSubdivisionCount(2, 3, 4)).toBe('3 a');
+  });
+
+  it('keeps a sixteenth-note visual grid for quarter and eighth-note clicks', () => {
+    expect(getVisualSubdivision(1)).toBe(4);
+    expect(getVisualSubdivision(2)).toBe(4);
+    expect(getVisualSubdivision(3)).toBe(3);
+    expect(getVisualSubdivision(4)).toBe(4);
+  });
+
+  it('marks the cells that actually produce sound', () => {
+    expect([0, 1, 2, 3].map((index) => isSubdivisionSoundCell(1, index))).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
+    expect([0, 1, 2, 3].map((index) => isSubdivisionSoundCell(2, index))).toEqual([
+      true,
+      false,
+      true,
+      false,
+    ]);
+    expect([0, 1, 2, 3].map((index) => isSubdivisionSoundCell(4, index))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(getVisualSubdivisionIndex(2, 1)).toBe(2);
   });
 });

@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BpmNumberInput from '../components/BpmNumberInput';
 import { preparePlaybackAudioSession, releasePlaybackAudioSession } from '../lib/audioPlaybackSession';
 import { clampBpm } from '../lib/bpm';
-import { buildSubdivisionCountGroups, getCurrentSubdivisionCount } from '../lib/subdivisionCount';
+import {
+  buildSubdivisionCountGroups,
+  getCurrentSubdivisionCount,
+  getVisualSubdivision,
+  getVisualSubdivisionIndex,
+  isSubdivisionSoundCell,
+} from '../lib/subdivisionCount';
 import {
   isKoreanCountVoiceSupported,
   primeKoreanCountVoice,
@@ -320,14 +326,19 @@ export default function MetronomeLabPage() {
 
   const rudiment = RUDIMENTS[Math.min(RUDIMENTS.length - 1, Math.max(0, rudimentIndex))];
   const progress = timerMinutes > 0 ? Math.min(100, (elapsedSeconds / (timerMinutes * 60)) * 100) : 0;
+  const visualSubdivision = getVisualSubdivision(subdivision);
   const subdivisionCountGroups = useMemo(
-    () => buildSubdivisionCountGroups(beatsPerBar, subdivision),
-    [beatsPerBar, subdivision],
+    () => buildSubdivisionCountGroups(beatsPerBar, visualSubdivision),
+    [beatsPerBar, visualSubdivision],
   );
   const currentSubdivisionCount = getCurrentSubdivisionCount(
     beatInBar,
     subdivisionInBeat,
     subdivision,
+  );
+  const activeVisualSubdivisionIndex = getVisualSubdivisionIndex(
+    subdivision,
+    subdivisionInBeat,
   );
 
   return (
@@ -380,10 +391,19 @@ export default function MetronomeLabPage() {
                 {labels.map((label, countSubdivisionIndex) => (
                   <span
                     key={`${countBeatIndex}-${countSubdivisionIndex}`}
-                    className={
-                      countBeatIndex === beatInBar && countSubdivisionIndex === subdivisionInBeat
+                    className={[
+                      isSubdivisionSoundCell(subdivision, countSubdivisionIndex)
+                        ? 'sound-on'
+                        : 'guide-only',
+                      countBeatIndex === beatInBar &&
+                      countSubdivisionIndex === activeVisualSubdivisionIndex
                         ? 'active'
-                        : ''
+                        : '',
+                    ].filter(Boolean).join(' ')}
+                    title={
+                      isSubdivisionSoundCell(subdivision, countSubdivisionIndex)
+                        ? '실제 클릭이 나는 위치'
+                        : '소리 없이 박을 나누어 보는 안내 위치'
                     }
                   >
                     {label}
@@ -394,12 +414,12 @@ export default function MetronomeLabPage() {
           </div>
           <p className="subdivision-count-hint">
             {subdivision === 4
-              ? '16분음표: 1 e & a'
+              ? '16분음표 클릭 · 모든 1 e & a 칸에서 소리'
               : subdivision === 3
-                ? '셋잇단: 1 trip let'
+                ? '셋잇단 클릭 · 1 trip let 세 칸으로 표시'
                 : subdivision === 2
-                  ? '8분음표: 1 &'
-                  : '4분음표: 1 2 3 4'}
+                  ? '8분음표 클릭 · 16분 격자에서 숫자와 & 칸에 소리'
+                  : '4분음표 클릭 · 16분 격자는 보이지만 숫자 칸에서만 소리'}
           </p>
 
           <div className="lab-primary-actions">
