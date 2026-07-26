@@ -10,6 +10,7 @@ import './ios-overflow-fix.css';
 import './full-bar-guide.css';
 import './drummer-training.css';
 
+// Keep feature styles explicit so mobile Safari loads the complete training UI.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     void navigator.serviceWorker.register('./sw.js').catch(() => undefined);
