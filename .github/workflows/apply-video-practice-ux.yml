@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   apply:
@@ -36,14 +36,14 @@ jobs:
           echo $? > patch-exit-code.txt
           cat patch-diagnostics.log
           exit 0
-      - name: Commit generated changes or diagnostics
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src e2e public/sw.js patch-diagnostics.log patch-exit-code.txt
-          if git diff --cached --quiet; then
-            echo "No generated changes"
-          else
-            git commit -m "Apply video practice UX patch"
-            git push origin HEAD:${{ github.head_ref || github.ref_name }}
-          fi
+      - name: Upload generated source and diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-practice-patch-output
+          if-no-files-found: error
+          path: |
+            patch-diagnostics.log
+            patch-exit-code.txt
+            src
+            e2e
+            public/sw.js
