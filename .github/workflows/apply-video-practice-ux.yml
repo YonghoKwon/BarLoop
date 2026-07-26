@@ -7,7 +7,6 @@ on:
     paths:
       - scripts/apply_video_practice_ux.py
       - scripts/run_video_practice_patch.py
-      - scripts/fix_video_runner.py
       - .github/workflows/apply-video-practice-ux.yml
   pull_request:
     branches:
@@ -15,7 +14,6 @@ on:
     paths:
       - scripts/apply_video_practice_ux.py
       - scripts/run_video_practice_patch.py
-      - scripts/fix_video_runner.py
       - .github/workflows/apply-video-practice-ux.yml
   workflow_dispatch:
 
@@ -45,7 +43,6 @@ jobs:
         id: generate
         run: |
           set +e
-          python scripts/fix_video_runner.py
           python scripts/run_video_practice_patch.py > generation.log 2>&1
           code=$?
           cat generation.log
