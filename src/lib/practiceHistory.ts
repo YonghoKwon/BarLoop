@@ -10,6 +10,15 @@ export interface PracticeSession {
   note: string;
 }
 
+export interface DailyPracticePoint {
+  key: string;
+  label: string;
+  activeSeconds: number;
+  sessions: number;
+  completed: number;
+  bestBpm: number;
+}
+
 const HISTORY_KEY = 'barloop:practice-history:v1';
 const DATABASE_NAME = 'barloop-practice';
 const STORE_NAME = 'sessions';
@@ -60,6 +69,14 @@ async function readDatabaseHistory(): Promise<PracticeSession[]> {
     .slice(0, 1000);
 }
 
+function localDateKey(date: Date): string {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
 export function readPracticeHistory(): PracticeSession[] {
   try {
     const value = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
@@ -101,13 +118,70 @@ export function removePracticeSession(id: string): PracticeSession[] {
   return next;
 }
 
+export function getDailyPracticeSeries(
+  items: PracticeSession[],
+  days = 7,
+  now: Date = new Date(),
+): DailyPracticePoint[] {
+  const safeDays = Math.max(1, Math.min(31, Math.round(days)));
+  const end = new Date(now);
+  end.setHours(0, 0, 0, 0);
+
+  const points = Array.from({ length: safeDays }, (_, index) => {
+    const date = new Date(end);
+    date.setDate(end.getDate() - (safeDays - index - 1));
+    return {
+      key: localDateKey(date),
+      label: date.toLocaleDateString('ko-KR', { weekday: 'short' }).replace('요일', ''),
+      activeSeconds: 0,
+      sessions: 0,
+      completed: 0,
+      bestBpm: 0,
+    } satisfies DailyPracticePoint;
+  });
+  const byKey = new Map(points.map((point) => [point.key, point]));
+
+  items.forEach((item) => {
+    const startedAt = new Date(item.startedAt);
+    if (Number.isNaN(startedAt.getTime())) return;
+    const point = byKey.get(localDateKey(startedAt));
+    if (!point) return;
+    point.activeSeconds += Math.max(0, Number(item.activeSeconds) || 0);
+    point.sessions += 1;
+    point.completed += item.completed ? 1 : 0;
+    point.bestBpm = Math.max(point.bestBpm, Number(item.bestBpm) || 0);
+  });
+
+  return points;
+}
+
+export function getPracticeStreak(items: PracticeSession[], now: Date = new Date()): number {
+  const activeKeys = new Set(
+    items
+      .filter((item) => item.activeSeconds > 0)
+      .map((item) => localDateKey(new Date(item.startedAt))),
+  );
+  const cursor = new Date(now);
+  cursor.setHours(0, 0, 0, 0);
+  let streak = 0;
+  while (activeKeys.has(localDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
 export function getWeeklySummary(items: PracticeSession[]) {
   const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const recent = items.filter((item) => new Date(item.startedAt).getTime() >= since);
+  const completed = recent.filter((item) => item.completed).length;
   return {
     sessions: recent.length,
     totalSeconds: recent.reduce((sum, item) => sum + item.activeSeconds, 0),
-    completed: recent.filter((item) => item.completed).length,
+    completed,
     bestBpm: recent.reduce((best, item) => Math.max(best, item.bestBpm || 0), 0),
+    activeDays: getDailyPracticeSeries(items).filter((point) => point.activeSeconds > 0).length,
+    streakDays: getPracticeStreak(items),
+    completionRate: recent.length ? Math.round((completed / recent.length) * 100) : 0,
   };
 }
