@@ -28,7 +28,7 @@ jobs:
           npm install --save-dev @playwright/test
           npm pkg set scripts.test:e2e="playwright test"
       - name: Remove temporary patch automation
-        run: rm scripts/apply_practice_accuracy_upgrades.py .github/workflows/apply-practice-accuracy-upgrades.yml
+        run: rm scripts/apply_practice_accuracy_upgrades.py .github/workflows/apply-practice-accuracy-upgrades.yml .practice-upgrade-trigger
       - name: Commit generated changes
         run: |
           git config user.name "github-actions[bot]"
