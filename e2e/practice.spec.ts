@@ -24,6 +24,14 @@ function subdivisionSelect(scope: Page | ReturnType<Page['locator']>) {
   return scope.locator('label').filter({ hasText: '서브디비전' }).locator('select').first();
 }
 
+function countInSelect(scope: ReturnType<Page['locator']>) {
+  return scope.locator('select:has(option[value="0"])');
+}
+
+function countInClickSelect(scope: ReturnType<Page['locator']>) {
+  return scope.locator('select:has(option[value="subdivision"])');
+}
+
 async function loadLocalAudio(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '내 영상·음원' }).click();
@@ -50,7 +58,7 @@ test('media practice keeps the guide moving with click output disabled', async (
   await loadLocalAudio(page);
   const panel = page.locator('section.metronome-panel');
   await subdivisionSelect(panel).selectOption('4');
-  await panel.getByLabel('카운트인', { exact: true }).selectOption('0');
+  await countInSelect(panel).selectOption('0');
   await expect(panel.getByLabel('한 마디 서브디비전 카운트')).toBeVisible();
 
   await page.locator('.play-button').click();
@@ -66,8 +74,8 @@ test('count-in and full practice overlay show the shared count grid', async ({ p
   await loadLocalAudio(page);
   const panel = page.locator('section.metronome-panel');
   await subdivisionSelect(panel).selectOption('4');
-  await panel.getByLabel('카운트인', { exact: true }).selectOption('1');
-  await panel.getByLabel('카운트인 클릭', { exact: true }).selectOption('subdivision');
+  await countInSelect(panel).selectOption('1');
+  await countInClickSelect(panel).selectOption('subdivision');
 
   await page.locator('.play-button').click();
   await expect(panel.getByText('카운트인', { exact: false }).first()).toBeVisible();
