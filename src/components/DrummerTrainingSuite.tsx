@@ -253,7 +253,9 @@ export default function DrummerTrainingSuite({
                             key={stepIndex}
                             type="button"
                             className={[
-                              subIndex === 0 ? 'downbeat-cell' : subIndex === 2 ? 'eighth-offbeat-cell' : 'sixteenth-between-cell',
+                              subIndex > 0 ? 'offbeat-cell' : 'downbeat-cell',
+                              subIndex === 2 ? 'ampersand-cell' : '',
+                              subIndex === 2 ? 'eighth-offbeat-cell' : subIndex > 0 ? 'sixteenth-between-cell' : '',
                               level === 2 ? 'accent' : level === 1 ? 'on' : '',
                               activeStep === stepIndex ? 'playhead' : '',
                             ].filter(Boolean).join(' ')}
