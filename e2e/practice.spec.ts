@@ -48,7 +48,7 @@ test('standalone metronome exposes the full subdivision guide', async ({ page })
 
 test('media practice keeps the guide moving with click output disabled', async ({ page }) => {
   await loadLocalAudio(page);
-  const panel = page.getByRole('heading', { name: '메트로놈·카운트인' }).locator('..').locator('..');
+  const panel = page.locator('section.metronome-panel');
   await subdivisionSelect(panel).selectOption('4');
   await panel.getByLabel('카운트인', { exact: true }).selectOption('0');
   await expect(panel.getByLabel('한 마디 서브디비전 카운트')).toBeVisible();
@@ -64,7 +64,7 @@ test('media practice keeps the guide moving with click output disabled', async (
 
 test('count-in and full practice overlay show the shared count grid', async ({ page }) => {
   await loadLocalAudio(page);
-  const panel = page.getByRole('heading', { name: '메트로놈·카운트인' }).locator('..').locator('..');
+  const panel = page.locator('section.metronome-panel');
   await subdivisionSelect(panel).selectOption('4');
   await panel.getByLabel('카운트인', { exact: true }).selectOption('1');
   await panel.getByLabel('카운트인 클릭', { exact: true }).selectOption('subdivision');
