@@ -27,7 +27,20 @@ jobs:
         with:
           node-version: 24
       - name: Apply metronome preset changes
-        run: python scripts/apply_practice_presets.py
+        id: apply-presets
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python scripts/apply_practice_presets.py 2>&1 | tee preset-migration.log
+      - name: Upload migration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preset-migration-log
+          path: preset-migration.log
+      - name: Stop after migration failure
+        if: steps.apply-presets.outcome != 'success'
+        run: exit 1
       - run: npm install
       - run: npm test
       - run: npm run build
