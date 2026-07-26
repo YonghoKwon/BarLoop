@@ -11,6 +11,7 @@ import './full-bar-guide.css';
 import './drummer-training.css';
 import './drummer-training-page.css';
 
+// Keep the three practice surfaces and their mobile layouts in the same PWA bundle.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     void navigator.serviceWorker.register('./sw.js').catch(() => undefined);
