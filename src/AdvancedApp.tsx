@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import App from './App';
 import AppUtilities from './components/AppUtilities';
+import MetronomeAudioRecovery from './components/MetronomeAudioRecovery';
 import PracticeCoach from './components/PracticeCoach';
 import MetronomeLabPage from './pages/MetronomeLabPage';
 
@@ -35,7 +36,14 @@ export default function AdvancedApp() {
     };
   }, [landscapePractice, route]);
 
-  if (route === 'metronome') return <MetronomeLabPage />;
+  if (route === 'metronome') {
+    return (
+      <>
+        <MetronomeLabPage />
+        <MetronomeAudioRecovery />
+      </>
+    );
+  }
 
   return (
     <>
@@ -45,6 +53,7 @@ export default function AdvancedApp() {
       </button>
       <PracticeCoach />
       <AppUtilities />
+      <MetronomeAudioRecovery />
     </>
   );
 }
