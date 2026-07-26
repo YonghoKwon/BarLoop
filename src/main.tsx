@@ -8,6 +8,7 @@ import './media-practice.css';
 import './ios-responsive.css';
 import './ios-overflow-fix.css';
 import './full-bar-guide.css';
+import './drummer-training.css';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
