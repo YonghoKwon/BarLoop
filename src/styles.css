@@ -252,3 +252,12 @@ footer { padding: 28px 0 34px; color: var(--text-muted); text-align: center; fon
 .practice-subdivision-guide .shared-count-beat span strong { font-size: clamp(.85rem, 2vw, 1.25rem); }
 @media (max-width: 760px) { .shared-subdivision-guide { justify-content: flex-start; } .shared-count-beat span { min-width: 29px; padding-inline: 3px; } .practice-subdivision-guide { margin-block: 0; } }
 @media (orientation: landscape) and (max-height: 520px) { .practice-subdivision-guide { max-height: 68px; padding-block: 4px; } .practice-subdivision-guide .shared-count-beat span { min-height: 48px; } }
+
+
+/* Practice accuracy and media count controls. */
+.media-count-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; padding: 12px; border: 1px solid #2c3342; border-radius: 12px; background: #0d1017; }
+.sync-offset-control { margin-top: 12px; padding: 12px; border: 1px solid #2c3342; border-radius: 12px; background: #0d1017; }
+.sync-offset-control .label-row strong { color: #ffd0c2; font-variant-numeric: tabular-nums; }
+.sync-offset-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.sync-offset-actions button { min-height: 38px; border: 1px solid #343b4b; border-radius: 8px; background: var(--surface-2); cursor: pointer; font-size: .76rem; }
+@media (max-width: 560px) { .media-count-options { grid-template-columns: 1fr; } .sync-offset-actions { grid-template-columns: 1fr 1fr; } }

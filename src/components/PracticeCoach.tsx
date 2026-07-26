@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeBpmText } from '../lib/bpm';
 import {
   addPracticeSession,
+  getDailyPracticeSeries,
   getWeeklySummary,
   readPracticeHistory,
   removePracticeSession,
@@ -69,6 +70,8 @@ export default function PracticeCoach() {
   const phaseLimit = resting ? settings.restSeconds : settings.workMinutes * 60;
   const targetSeconds = settings.targetMinutes * 60;
   const summary = useMemo(() => getWeeklySummary(history), [history]);
+  const dailySeries = useMemo(() => getDailyPracticeSeries(history), [history]);
+  const chartMaxSeconds = Math.max(60, ...dailySeries.map((point) => point.activeSeconds));
 
   useEffect(() => {
     void restorePracticeHistoryFromDatabase().then(setHistory);
@@ -171,9 +174,33 @@ export default function PracticeCoach() {
           <div className="coach-summary">
             <div><strong>{summary.sessions}</strong><span>최근 7일 세션</span></div>
             <div><strong>{Math.round(summary.totalSeconds / 60)}분</strong><span>총 연습</span></div>
-            <div><strong>{summary.completed}</strong><span>완료</span></div>
+            <div><strong>{summary.activeDays}일</strong><span>연습한 날</span></div>
+            <div><strong>{summary.streakDays}일</strong><span>연속 연습</span></div>
+            <div><strong>{summary.completionRate}%</strong><span>완료율</span></div>
             <div><strong>{summary.bestBpm || '—'}</strong><span>최고 BPM</span></div>
           </div>
+
+          <section className="coach-chart-section" aria-label="최근 7일 연습 시간 그래프">
+            <div className="coach-chart-title">
+              <strong>최근 7일 연습 흐름</strong>
+              <span>막대: 연습 시간 · 숫자: 최고 BPM</span>
+            </div>
+            <div className="coach-chart">
+              {dailySeries.map((point) => {
+                const height = point.activeSeconds > 0
+                  ? Math.max(8, (point.activeSeconds / chartMaxSeconds) * 100)
+                  : 2;
+                return (
+                  <div key={point.key} className="coach-chart-day" title={`${point.key} · ${Math.round(point.activeSeconds / 60)}분 · 최고 ${point.bestBpm || 0} BPM`}>
+                    <span className="coach-chart-bpm">{point.bestBpm || '·'}</span>
+                    <div className="coach-chart-track"><i style={{ height: `${height}%` }} /></div>
+                    <strong>{point.label}</strong>
+                    <small>{Math.round(point.activeSeconds / 60)}분</small>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
 
           <details>
             <summary>최근 연습 기록</summary>

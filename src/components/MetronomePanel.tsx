@@ -1,5 +1,11 @@
-import type { Subdivision } from '../lib/metronome';
+import {
+  type CountInClickMode,
+  type MediaCountMode,
+  type Subdivision,
+} from '../lib/metronome';
+import { isKoreanCountVoiceSupported } from '../lib/koreanCountVoice';
 import { getCurrentSubdivisionCount } from '../lib/subdivisionCount';
+import { METRONOME_AUDIO_RESUME_EVENT } from '../lib/standaloneMetronome';
 import SubdivisionCountGuide from './SubdivisionCountGuide';
 
 interface MetronomePanelProps {
@@ -11,6 +17,12 @@ interface MetronomePanelProps {
   onSubdivisionChange: (subdivision: Subdivision) => void;
   volume: number;
   onVolumeChange: (volume: number) => void;
+  countMode: MediaCountMode;
+  onCountModeChange: (mode: MediaCountMode) => void;
+  countInClickMode: CountInClickMode;
+  onCountInClickModeChange: (mode: CountInClickMode) => void;
+  syncOffsetMs: number;
+  onSyncOffsetMsChange: (offsetMs: number) => void;
   gapEnabled: boolean;
   onGapEnabledChange: (enabled: boolean) => void;
   gapPlayBars: number;
@@ -33,6 +45,12 @@ export default function MetronomePanel({
   onSubdivisionChange,
   volume,
   onVolumeChange,
+  countMode,
+  onCountModeChange,
+  countInClickMode,
+  onCountInClickModeChange,
+  syncOffsetMs,
+  onSyncOffsetMsChange,
   gapEnabled,
   onGapEnabledChange,
   gapPlayBars,
@@ -46,6 +64,15 @@ export default function MetronomePanel({
   countInRemaining,
 }: MetronomePanelProps) {
   const currentCount = getCurrentSubdivisionCount(beatInBar, subdivisionInBeat, subdivision);
+  const voiceSupported = isKoreanCountVoiceSupported();
+  const outputLabel = countMode === 'voice' ? 'VOICE' : countMode === 'both' ? 'BOTH' : 'CLICK';
+  const statusLabel = countInRemaining !== null
+    ? 'COUNT IN'
+    : !enabled
+      ? 'GUIDE'
+      : audibleBeat
+        ? outputLabel
+        : 'GAP';
 
   return (
     <section className="panel tool-panel metronome-panel">
@@ -66,7 +93,7 @@ export default function MetronomePanel({
 
       <div className="metronome-count-readout">
         <strong>{currentCount}</strong>
-        <span>{countInRemaining !== null ? 'COUNT IN' : audibleBeat ? 'CLICK' : 'GAP'}</span>
+        <span>{statusLabel}</span>
       </div>
 
       <SubdivisionCountGuide
@@ -119,6 +146,61 @@ export default function MetronomePanel({
         </label>
       </div>
 
+      <div className="media-count-options">
+        <label>
+          메인 박 출력
+          <select
+            value={countMode}
+            onChange={(event) => onCountModeChange(event.target.value as MediaCountMode)}
+          >
+            <option value="click">클릭음</option>
+            <option value="voice">한국어 카운트</option>
+            <option value="both">클릭 + 한국어 카운트</option>
+          </select>
+        </label>
+        <label>
+          카운트인 클릭
+          <select
+            value={countInClickMode}
+            onChange={(event) => onCountInClickModeChange(event.target.value as CountInClickMode)}
+          >
+            <option value="beat">숫자 박만 클릭</option>
+            <option value="subdivision">선택한 모든 칸 클릭</option>
+          </select>
+        </label>
+      </div>
+      {!voiceSupported && countMode !== 'click' && (
+        <p className="hint">이 브라우저에서는 한국어 시스템 음성을 찾지 못해 클릭음으로 자동 대체됩니다.</p>
+      )}
+
+      <div className="sync-offset-control">
+        <div className="label-row">
+          <label htmlFor="media-click-sync">클릭 싱크 보정</label>
+          <strong>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</strong>
+        </div>
+        <input
+          id="media-click-sync"
+          type="range"
+          min={-200}
+          max={200}
+          step={5}
+          value={syncOffsetMs}
+          onChange={(event) => onSyncOffsetMsChange(Number(event.target.value))}
+        />
+        <div className="sync-offset-actions">
+          <button type="button" onClick={() => onSyncOffsetMsChange(Math.max(-200, syncOffsetMs - 10))}>−10ms</button>
+          <button type="button" onClick={() => onSyncOffsetMsChange(0)}>0으로</button>
+          <button type="button" onClick={() => onSyncOffsetMsChange(Math.min(200, syncOffsetMs + 10))}>+10ms</button>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event(METRONOME_AUDIO_RESUME_EVENT))}
+          >
+            소리 테스트
+          </button>
+        </div>
+        <p className="hint">음수가 클릭을 앞당기고, 양수가 클릭을 늦춥니다. 블루투스 출력 지연에 맞춰 조절하세요.</p>
+      </div>
+
       <div className="gap-click-row">
         <label className="switch-label">
           <input
@@ -151,7 +233,7 @@ export default function MetronomePanel({
           마디
         </label>
       </div>
-      <p className="hint">4분음표에서도 1 e & a 격자를 유지하며, 실제 소리가 나는 칸은 점으로 구분합니다.</p>
+      <p className="hint">화면의 `1 e & a`는 메트로놈을 꺼도 영상 시간에 맞춰 계속 움직입니다.</p>
     </section>
   );
 }

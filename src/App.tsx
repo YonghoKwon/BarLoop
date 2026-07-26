@@ -20,7 +20,21 @@ import { useDebouncedStorage } from './hooks/useDebouncedStorage';
 import { useMidiControls, type MidiMappings } from './hooks/useMidiControls';
 import { usePlaybackClock } from './hooks/usePlaybackClock';
 import { useWakeLock } from './hooks/useWakeLock';
-import { MetronomeEngine, type MetronomeSettings, type Subdivision } from './lib/metronome';
+import {
+  MetronomeEngine,
+  type CountInClickMode,
+  type MediaCountMode,
+  type MetronomeSettings,
+  type Subdivision,
+} from './lib/metronome';
+import { preparePlaybackAudioSession, releasePlaybackAudioSession } from './lib/audioPlaybackSession';
+import {
+  isKoreanCountVoiceSupported,
+  primeKoreanCountVoice,
+  speakKoreanCount,
+  stopKoreanCountVoice,
+} from './lib/koreanCountVoice';
+import { getMediaBeatPosition } from './lib/mediaBeat';
 import { readSections, writeSections } from './lib/sectionStorage';
 import { clamp, extractYouTubeId, formatTime, generateBars } from './lib/time';
 import { createWaveformPeaks } from './lib/waveform';
@@ -41,6 +55,9 @@ interface StoredSettings {
   countInBars: number;
   subdivision: Subdivision;
   metronomeVolume: number;
+  countMode: MediaCountMode;
+  countInClickMode: CountInClickMode;
+  syncOffsetMs: number;
   gapEnabled: boolean;
   gapPlayBars: number;
   gapMuteBars: number;
@@ -75,6 +92,9 @@ const DEFAULT_SETTINGS: StoredSettings = {
   countInBars: 1,
   subdivision: 1,
   metronomeVolume: 0.55,
+  countMode: 'click',
+  countInClickMode: 'beat',
+  syncOffsetMs: 0,
   gapEnabled: false,
   gapPlayBars: 4,
   gapMuteBars: 2,
@@ -113,6 +133,13 @@ function readStoredSettings(): StoredSettings {
         ? (Number(parsed.subdivision) as Subdivision)
         : 1,
       metronomeVolume: clamp(Number(parsed.metronomeVolume) || 0.55, 0.05, 1),
+      countMode: ['click', 'voice', 'both'].includes(String(parsed.countMode))
+        ? (String(parsed.countMode) as MediaCountMode)
+        : 'click',
+      countInClickMode: ['beat', 'subdivision'].includes(String(parsed.countInClickMode))
+        ? (String(parsed.countInClickMode) as CountInClickMode)
+        : 'beat',
+      syncOffsetMs: clamp(Math.round(Number(parsed.syncOffsetMs) || 0), -200, 200),
       gapEnabled: Boolean(parsed.gapEnabled),
       gapPlayBars: clamp(Math.round(Number(parsed.gapPlayBars) || 4), 1, 16),
       gapMuteBars: clamp(Math.round(Number(parsed.gapMuteBars) || 2), 1, 16),
@@ -154,6 +181,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const localFileRef = useRef<LocalFileState | null>(null);
   const tapTimesRef = useRef<number[]>([]);
+  const tapMediaTimesRef = useRef<number[]>([]);
   const metronomeRef = useRef(new MetronomeEngine());
   const countInSequenceRef = useRef(0);
   const loopCountRef = useRef(0);
@@ -197,6 +225,9 @@ function App() {
   const [countInBars, setCountInBars] = useState(initialSettingsRef.current.countInBars);
   const [subdivision, setSubdivision] = useState<Subdivision>(initialSettingsRef.current.subdivision);
   const [metronomeVolume, setMetronomeVolume] = useState(initialSettingsRef.current.metronomeVolume);
+  const [countMode, setCountMode] = useState<MediaCountMode>(initialSettingsRef.current.countMode);
+  const [countInClickMode, setCountInClickMode] = useState<CountInClickMode>(initialSettingsRef.current.countInClickMode);
+  const [syncOffsetMs, setSyncOffsetMs] = useState(initialSettingsRef.current.syncOffsetMs);
   const [gapEnabled, setGapEnabled] = useState(initialSettingsRef.current.gapEnabled);
   const [gapPlayBars, setGapPlayBars] = useState(initialSettingsRef.current.gapPlayBars);
   const [gapMuteBars, setGapMuteBars] = useState(initialSettingsRef.current.gapMuteBars);
@@ -218,6 +249,9 @@ function App() {
   const [midiMappings, setMidiMappings] = useState(initialSettingsRef.current.midiMappings);
 
   const bpm = Number(bpmInput);
+  const voiceCountSupported = isKoreanCountVoiceSupported();
+  const outputHasClick = countMode !== 'voice' || !voiceCountSupported;
+  const outputHasVoice = countMode !== 'click' && voiceCountSupported;
   const hasActiveSource = sourceType === 'youtube' ? Boolean(youtubeVideoId) : Boolean(localFile);
   const mediaKey = useMemo(() => {
     if (sourceType === 'youtube' && youtubeVideoId) return `youtube:${youtubeVideoId}`;
@@ -264,6 +298,9 @@ function App() {
     countInBars,
     subdivision,
     metronomeVolume,
+    countMode,
+    countInClickMode,
+    syncOffsetMs,
     gapEnabled,
     gapPlayBars,
     gapMuteBars,
@@ -272,6 +309,8 @@ function App() {
     beatsPerBar,
     bpm,
     countInBars,
+    countInClickMode,
+    countMode,
     gapEnabled,
     gapMuteBars,
     gapPlayBars,
@@ -284,6 +323,7 @@ function App() {
     preRollBeats,
     preservePitch,
     subdivision,
+    syncOffsetMs,
   ]);
   useDebouncedStorage(SETTINGS_KEY, storedSettings);
 
@@ -390,12 +430,17 @@ function App() {
     const secondsPerBeat = 60 / Math.max(20, Number.isFinite(bpm) ? bpm : 120);
     seekTo(Math.max(0, activeLoop.start - preRollBeats * secondsPerBeat));
     try {
+      await Promise.all([
+        preparePlaybackAudioSession(),
+        metronomeRef.current.unlock(),
+      ]);
+      if (outputHasVoice) primeKoreanCountVoice();
       await playerRef.current?.play();
       setNotice(preRollBeats > 0 ? `${preRollBeats}박 프리롤부터 재생합니다.` : 'A 지점부터 재생합니다.');
     } catch {
       setError('프리롤 재생을 시작할 수 없습니다. 화면을 한 번 탭한 뒤 다시 시도해 주세요.');
     }
-  }, [activeLoop.start, bpm, isReady, preRollBeats, seekTo]);
+  }, [activeLoop.start, bpm, isReady, outputHasVoice, preRollBeats, seekTo]);
 
   const applyFillPreset = useCallback((grooveBars: 3 | 7) => {
     if (!selectedBars || bars.length === 0) {
@@ -416,6 +461,8 @@ function App() {
     volume: metronomeVolume,
     playbackRate,
     firstDownbeat,
+    syncOffsetMs,
+    clickEnabled: outputHasClick,
     gapEnabled,
     gapPlayBars,
     gapMuteBars,
@@ -427,25 +474,43 @@ function App() {
     gapMuteBars,
     gapPlayBars,
     metronomeVolume,
+    outputHasClick,
     playbackRate,
     subdivision,
+    syncOffsetMs,
   ]);
+
+  const speakCurrentBeat = useCallback((beat: number, nextSubdivisionInBeat: number, audible: boolean) => {
+    if (!audible || nextSubdivisionInBeat !== 0 || !outputHasVoice) return;
+    speakKoreanCount(
+      beat,
+      (Number.isFinite(bpm) && bpm > 0 ? bpm : 120) * playbackRate,
+      metronomeVolume,
+    );
+  }, [bpm, metronomeVolume, outputHasVoice, playbackRate]);
 
   const togglePlayback = useCallback(async () => {
     const player = playerRef.current;
     if (!player || !isReady) return;
     if (isPlaying) {
       countInSequenceRef.current += 1;
-      metronomeRef.current.cancelCountIn();
+      metronomeRef.current.stopAll();
       setCountInRemaining(null);
+      stopKoreanCountVoice();
+      releasePlaybackAudioSession();
       player.pause();
       return;
     }
 
     const sequence = countInSequenceRef.current + 1;
     countInSequenceRef.current = sequence;
+    const safeBpm = Number.isFinite(bpm) && bpm > 0 ? bpm : 120;
     try {
-      await metronomeRef.current.unlock();
+      await Promise.all([
+        preparePlaybackAudioSession(),
+        metronomeRef.current.unlock(),
+      ]);
+      if (outputHasVoice) primeKoreanCountVoice();
       if (countInBars > 0) {
         try {
           await player.play();
@@ -455,15 +520,19 @@ function App() {
         }
         setCountInRemaining(countInBars * beatsPerBar);
         await metronomeRef.current.countIn({
-          bpm: Number.isFinite(bpm) && bpm > 0 ? bpm : 120,
+          bpm: safeBpm * playbackRate,
           beatsPerBar,
           bars: countInBars,
           volume: metronomeVolume,
-          onBeat: (remaining, beat) => {
+          subdivision,
+          clickMode: countInClickMode,
+          clickEnabled: outputHasClick,
+          onStep: (remaining, beat, nextSubdivisionInBeat) => {
             setCountInRemaining(remaining);
             setBeatInBar(beat);
-            setSubdivisionInBeat(0);
+            setSubdivisionInBeat(nextSubdivisionInBeat);
             setAudibleBeat(true);
+            speakCurrentBeat(beat, nextSubdivisionInBeat, true);
           },
         });
       }
@@ -472,9 +541,24 @@ function App() {
       await player.play();
     } catch {
       setCountInRemaining(null);
+      stopKoreanCountVoice();
+      releasePlaybackAudioSession();
       setError('재생을 시작할 수 없습니다. 화면을 한 번 더 탭한 뒤 시도해 주세요.');
     }
-  }, [beatsPerBar, bpm, countInBars, isPlaying, isReady, metronomeVolume]);
+  }, [
+    beatsPerBar,
+    bpm,
+    countInBars,
+    countInClickMode,
+    isPlaying,
+    isReady,
+    metronomeVolume,
+    outputHasClick,
+    outputHasVoice,
+    playbackRate,
+    speakCurrentBeat,
+    subdivision,
+  ]);
 
   const midi = useMidiControls(midiMappings, {
     onTogglePlayback: () => void togglePlayback(),
@@ -501,10 +585,37 @@ function App() {
         setBeatInBar(beat);
         setSubdivisionInBeat(nextSubdivisionInBeat);
         setAudibleBeat(audible);
+        speakCurrentBeat(beat, nextSubdivisionInBeat, audible);
       },
     ).catch(() => setError('메트로놈 오디오를 시작할 수 없습니다.'));
     return () => metronomeRef.current.stopContinuous();
-  }, [isPlaying, metronomeEnabled, metronomeSettings]);
+  }, [isPlaying, metronomeEnabled, metronomeSettings, speakCurrentBeat]);
+
+  useEffect(() => {
+    if (!isReady || countInRemaining !== null || (isPlaying && metronomeEnabled)) return;
+    const position = getMediaBeatPosition(
+      currentTime,
+      Number.isFinite(bpm) && bpm > 0 ? bpm : 120,
+      beatsPerBar,
+      subdivision,
+      firstDownbeat,
+      syncOffsetMs,
+    );
+    setBeatInBar(position.beatInBar);
+    setSubdivisionInBeat(position.subdivisionInBeat);
+    setAudibleBeat(true);
+  }, [
+    beatsPerBar,
+    bpm,
+    countInRemaining,
+    currentTime,
+    firstDownbeat,
+    isPlaying,
+    isReady,
+    metronomeEnabled,
+    subdivision,
+    syncOffsetMs,
+  ]);
 
   useEffect(() => {
     metronomeRef.current.update(metronomeSettings);
@@ -517,6 +628,8 @@ function App() {
   useEffect(() => () => {
     if (localFileRef.current) URL.revokeObjectURL(localFileRef.current.url);
     metronomeRef.current.stopAll();
+    stopKoreanCountVoice();
+    releasePlaybackAudioSession();
     stopTrainerTimers();
   }, [stopTrainerTimers]);
 
@@ -603,6 +716,8 @@ function App() {
     setLoopCount(0);
     loopCountRef.current = 0;
     setCountInRemaining(null);
+    stopKoreanCountVoice();
+    releasePlaybackAudioSession();
     setError('');
     setNotice('');
     setTrainerActive(false);
@@ -631,6 +746,9 @@ function App() {
   }, [setDisplayedTime]);
 
   const handlePlayerError = useCallback((message: string) => {
+    metronomeRef.current.stopAll();
+    stopKoreanCountVoice();
+    releasePlaybackAudioSession();
     setError(message);
     setNotice('');
     setIsReady(false);
@@ -680,19 +798,45 @@ function App() {
     const now = performance.now();
     const previous = tapTimesRef.current.at(-1);
     let times = tapTimesRef.current;
-    if (!previous || now - previous > 2500) times = [];
+    let mediaTimes = tapMediaTimesRef.current;
+    if (!previous || now - previous > 2500) {
+      times = [];
+      mediaTimes = [];
+    }
+
+    const mediaNow = playerRef.current?.getCurrentTime() ?? currentTime;
     times = [...times, now].slice(-8);
+    mediaTimes = [...mediaTimes, mediaNow].slice(-8);
     tapTimesRef.current = times;
+    tapMediaTimesRef.current = mediaTimes;
     setTapCount(times.length);
+
+    if (times.length === 1 && isReady) {
+      setFirstDownbeat(mediaNow);
+      setNotice(`첫 탭 ${formatTime(mediaNow, true)}을 다운비트로 지정했습니다. 같은 박으로 계속 탭해 주세요.`);
+      setError('');
+      return;
+    }
+
     if (times.length >= 2) {
       const intervals = times.slice(1).map((time, index) => time - times[index]);
       const average = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
       const tappedBpm = clamp(Math.round(60000 / average), 20, 400);
+      const tappedDownbeat = mediaTimes[0] ?? mediaNow;
       setBpmInput(String(tappedBpm));
-      setNotice(`${times.length}회 탭 평균으로 ${tappedBpm} BPM을 설정했습니다.`);
+      if (isReady) setFirstDownbeat(tappedDownbeat);
+
+      if (times.length >= 4 && isReady && duration > 0) {
+        const nextBars = generateBars(duration, tappedBpm, beatsPerBar, tappedDownbeat);
+        setBars(nextBars);
+        setSelectedBarStart(0);
+        setSelectedBarEnd(0);
+        setLoopMode('bars');
+        setNotice(`${times.length}회 탭으로 ${tappedBpm} BPM과 첫 박을 맞추고 ${nextBars.length}개 마디를 미리 생성했습니다.`);
+      } else {
+        setNotice(`${times.length}회 탭 평균으로 ${tappedBpm} BPM을 설정했습니다. 4회 이상 탭하면 마디도 미리 생성합니다.`);
+      }
       setError('');
-    } else {
-      setNotice('리듬에 맞춰 두 번 이상 탭해 주세요.');
     }
   };
 
@@ -795,6 +939,9 @@ function App() {
     setMetronomeEnabled(false);
     setCountInBars(1);
     setSubdivision(1);
+    setCountMode('click');
+    setCountInClickMode('beat');
+    setSyncOffsetMs(0);
     setGapEnabled(false);
     setFirstDownbeat(0);
     setBars([]);
@@ -803,6 +950,7 @@ function App() {
     setLoopCount(0);
     loopCountRef.current = 0;
     tapTimesRef.current = [];
+    tapMediaTimesRef.current = [];
     setTapCount(0);
     stopTrainer();
     setError('');
@@ -897,7 +1045,7 @@ function App() {
                 <div className="field"><label htmlFor="bpm">원곡 BPM</label><div className="number-stepper"><button type="button" onClick={() => setBpmInput(String(clamp((Number(bpmInput) || 120) - 1, 20, 400)))}>−</button><input id="bpm" type="text" inputMode="numeric" pattern="[0-9]*" value={bpmInput} onChange={(event) => { setBpmInput(normalizeBpmInput(event.target.value)); clearMessages(); }} onBlur={() => setBpmInput(String(clamp(Math.round(Number(bpmInput) || 120), 20, 400)))} /><button type="button" onClick={() => setBpmInput(String(clamp((Number(bpmInput) || 120) + 1, 20, 400)))}>＋</button></div></div>
                 <div className="field"><label htmlFor="beats">한 마디 박자</label><select id="beats" value={beatsPerBar} onChange={(event) => setBeatsPerBar(Number(event.target.value))}>{[2, 3, 4, 5, 6, 7, 8, 12].map((value) => <option key={value} value={value}>{value}박</option>)}</select></div>
               </div>
-              <div className="tap-tempo-row"><button type="button" className="secondary-button" onClick={tapTempo}>탭 템포</button><div><strong>리듬에 맞춰 탭</strong><span>{tapCount > 0 ? `${tapCount}회 입력` : '2회 이상 탭'}</span></div></div>
+              <div className="tap-tempo-row"><button type="button" className="secondary-button" onClick={tapTempo}>박자 맞춤 탭</button><div><strong>첫 탭 = 첫 박</strong><span>{tapCount > 0 ? `${tapCount}회 입력 · 4회부터 마디 미리 생성` : '영상의 첫 박부터 4회 이상 탭'}</span></div></div>
               <div className="field"><div className="label-row"><label htmlFor="downbeat">첫 다운비트</label><button type="button" className="text-button" disabled={!isReady} onClick={() => setFirstDownbeat(currentTime)}>현재 위치</button></div><div className="stepper-row"><button type="button" disabled={!isReady} onClick={() => setFirstDownbeat((value) => clamp(value - 0.05, 0, duration))}>−0.05</button><input id="downbeat" type="number" min={0} max={duration || undefined} step={0.01} value={Number(firstDownbeat.toFixed(2))} onChange={(event) => setFirstDownbeat(clamp(Number(event.target.value), 0, duration || 0))} /><button type="button" disabled={!isReady} onClick={() => setFirstDownbeat((value) => clamp(value + 0.05, 0, duration))}>+0.05</button><button type="button" disabled={!isReady} onClick={() => seekTo(firstDownbeat)}>이동</button></div></div>
               <button type="button" className="primary-button full-width" disabled={!isReady} onClick={generateBarSegments}>마디 나누기</button>
             </section>
@@ -911,7 +1059,7 @@ function App() {
 
         <div className="tools-grid">
           <MediaPracticePanel mediaVolume={mediaVolume} onMediaVolumeChange={setMediaVolume} preRollBeats={preRollBeats} onPreRollBeatsChange={setPreRollBeats} beatsPerBar={beatsPerBar} bpm={Number.isFinite(bpm) ? bpm : 120} disabled={!isReady} canUseBars={bars.length >= 4} onPlayPreRoll={() => void playFromPreRoll()} onFillPreset={applyFillPreset} />
-          <MetronomePanel enabled={metronomeEnabled} onEnabledChange={setMetronomeEnabled} countInBars={countInBars} onCountInBarsChange={setCountInBars} subdivision={subdivision} onSubdivisionChange={setSubdivision} volume={metronomeVolume} onVolumeChange={setMetronomeVolume} gapEnabled={gapEnabled} onGapEnabledChange={setGapEnabled} gapPlayBars={gapPlayBars} gapMuteBars={gapMuteBars} onGapPlayBarsChange={(value) => setGapPlayBars(clamp(Math.round(value), 1, 16))} onGapMuteBarsChange={(value) => setGapMuteBars(clamp(Math.round(value), 1, 16))} beatInBar={beatInBar} subdivisionInBeat={subdivisionInBeat} beatsPerBar={beatsPerBar} audibleBeat={audibleBeat} countInRemaining={countInRemaining} />
+          <MetronomePanel enabled={metronomeEnabled} onEnabledChange={setMetronomeEnabled} countInBars={countInBars} onCountInBarsChange={setCountInBars} subdivision={subdivision} onSubdivisionChange={setSubdivision} volume={metronomeVolume} onVolumeChange={setMetronomeVolume} countMode={countMode} onCountModeChange={setCountMode} countInClickMode={countInClickMode} onCountInClickModeChange={setCountInClickMode} syncOffsetMs={syncOffsetMs} onSyncOffsetMsChange={(value) => setSyncOffsetMs(clamp(Math.round(value), -200, 200))} gapEnabled={gapEnabled} onGapEnabledChange={setGapEnabled} gapPlayBars={gapPlayBars} gapMuteBars={gapMuteBars} onGapPlayBarsChange={(value) => setGapPlayBars(clamp(Math.round(value), 1, 16))} onGapMuteBarsChange={(value) => setGapMuteBars(clamp(Math.round(value), 1, 16))} beatInBar={beatInBar} subdivisionInBeat={subdivisionInBeat} beatsPerBar={beatsPerBar} audibleBeat={audibleBeat} countInRemaining={countInRemaining} />
           <TempoTrainerPanel settings={trainerSettings} currentBpm={trainerCurrentBpm} baseBpm={Number.isFinite(bpm) ? bpm : 120} active={trainerActive} onChange={setTrainerSettings} onStart={startTrainer} onStop={stopTrainer} />
           <SectionPresetPanel mediaKey={mediaKey} sections={sections} currentStart={activeLoop.start} currentEnd={activeLoop.end} bpm={Number.isFinite(bpm) ? bpm : 120} playbackRate={playbackRate} disabled={!isReady} onSectionsChange={setSections} onLoad={loadSection} onNotice={(message) => { setNotice(message); setError(''); }} onError={(message) => { setError(message); setNotice(''); }} />
           <MidiControlPanel supported={midi.supported} enabled={midi.enabled} connectedInputs={midi.connectedInputs} lastNote={midi.lastNote} error={midi.error} mappings={midiMappings} onMappingsChange={setMidiMappings} onEnable={() => void midi.enable()} onDisable={midi.disable} />
@@ -923,7 +1071,7 @@ function App() {
 
       <footer><p>로컬 파일과 연습 데이터는 서버로 전송되지 않습니다. 브라우저 호환 코덱과 기기 성능에 따라 동작이 달라질 수 있습니다.</p></footer>
 
-      <PracticeModeOverlay visible={practiceMode} isPlaying={isPlaying} bpm={Number.isFinite(bpm) ? bpm : 120} playbackRate={playbackRate} currentTime={currentTime} loopStart={activeLoop.start} loopEnd={activeLoop.end} loopCount={loopCount} currentBeat={beatInBar} subdivisionInBeat={subdivisionInBeat} subdivision={subdivision} beatsPerBar={beatsPerBar} metronomeEnabled={metronomeEnabled} audibleBeat={audibleBeat} countInRemaining={countInRemaining} wakeLockActive={wakeLock.active} onClose={() => void closePracticeMode()} onTogglePlayback={() => void togglePlayback()} onPrevious={() => moveBarSelection(-1)} onRestart={restartLoop} onNext={() => moveBarSelection(1)} onToggleWakeLock={() => { if (wakeLock.active) void wakeLock.release(); else void wakeLock.request(); }} />
+      <PracticeModeOverlay visible={practiceMode} isPlaying={isPlaying} bpm={Number.isFinite(bpm) ? bpm : 120} playbackRate={playbackRate} currentTime={currentTime} loopStart={activeLoop.start} loopEnd={activeLoop.end} loopCount={loopCount} currentBeat={beatInBar} subdivisionInBeat={subdivisionInBeat} subdivision={subdivision} beatsPerBar={beatsPerBar} metronomeEnabled={metronomeEnabled} countMode={countMode} audibleBeat={audibleBeat} countInRemaining={countInRemaining} wakeLockActive={wakeLock.active} onClose={() => void closePracticeMode()} onTogglePlayback={() => void togglePlayback()} onPrevious={() => moveBarSelection(-1)} onRestart={restartLoop} onNext={() => moveBarSelection(1)} onToggleWakeLock={() => { if (wakeLock.active) void wakeLock.release(); else void wakeLock.request(); }} />
     </div>
   );
 }
