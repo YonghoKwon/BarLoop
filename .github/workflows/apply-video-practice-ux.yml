@@ -36,3 +36,4 @@ jobs:
             git commit -m "Improve video practice and training controls"
             git push origin HEAD:agent/video-practice-ux-training-controls
           fi
+# trigger: 2026-07-27
