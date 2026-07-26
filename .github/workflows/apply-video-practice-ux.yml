@@ -29,6 +29,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Archive clean source
+        run: tar --exclude=.git --exclude=clean-source.tar.gz --exclude=patched-source.tar.gz -czf clean-source.tar.gz .
       - name: Apply patch and capture diagnostics
         run: |
           set +e
@@ -36,14 +38,15 @@ jobs:
           echo $? > patch-exit-code.txt
           cat patch-diagnostics.log
           exit 0
+      - name: Archive patched source
+        run: tar --exclude=.git --exclude=clean-source.tar.gz --exclude=patched-source.tar.gz -czf patched-source.tar.gz .
       - name: Upload generated source and diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: video-practice-patch-output
+          name: video-practice-patch-workspace
           if-no-files-found: error
           path: |
+            clean-source.tar.gz
+            patched-source.tar.gz
             patch-diagnostics.log
             patch-exit-code.txt
-            src
-            e2e
-            public/sw.js
