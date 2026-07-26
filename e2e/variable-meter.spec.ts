@@ -30,7 +30,7 @@ test('drum sequencer expands to seven beats and marks syncopation cells', async 
   await expect(page.getByLabel('7박 한 마디 16분음표 위치').locator(':scope > div')).toHaveCount(7);
 
   await page.getByRole('button', { name: '모든 &에 8분 엇박' }).click();
-  await expect(page.getByLabel('하이햇 1 & 엇박 강세')).toBeVisible();
+  await expect(page.getByLabel(/하이햇 & .*강세/)).toBeVisible();
   await expect(page.locator('.drum-substep-grid button.offbeat-cell').first()).toBeVisible();
   await expectNoPageOverflow(page);
 });
