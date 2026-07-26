@@ -36,7 +36,19 @@ jobs:
           )
           path.write_text(text)
           PY
-      - run: node scripts/apply_subdivision_counts.mjs
+      - name: Apply source changes
+        id: apply-source
+        continue-on-error: true
+        run: node scripts/apply_subdivision_counts.mjs > apply-subdivision.log 2>&1
+      - name: Upload apply diagnostics
+        if: steps.apply-source.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: subdivision-apply-diagnostics
+          path: apply-subdivision.log
+      - name: Fail when apply failed
+        if: steps.apply-source.outcome != 'success'
+        run: exit 1
       - run: rm -f .github/workflows/apply-subdivision-pr.yml
       - name: Commit generated changes
         run: |
