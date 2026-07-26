@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { normalizeBpmText } from '../lib/bpm';
 import {
   addPracticeSession,
   getWeeklySummary,
   readPracticeHistory,
   removePracticeSession,
+  restorePracticeHistoryFromDatabase,
   type PracticeSession,
 } from '../lib/practiceHistory';
 
@@ -67,6 +69,10 @@ export default function PracticeCoach() {
   const phaseLimit = resting ? settings.restSeconds : settings.workMinutes * 60;
   const targetSeconds = settings.targetMinutes * 60;
   const summary = useMemo(() => getWeeklySummary(history), [history]);
+
+  useEffect(() => {
+    void restorePracticeHistoryFromDatabase().then(setHistory);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -150,8 +156,8 @@ export default function PracticeCoach() {
             <label>목표 시간<select value={settings.targetMinutes} onChange={(event) => setSettings({ ...settings, targetMinutes: Number(event.target.value) })}>{[10, 15, 20, 30, 45, 60].map((value) => <option key={value} value={value}>{value}분</option>)}</select></label>
             <label>연주 구간<select value={settings.workMinutes} onChange={(event) => setSettings({ ...settings, workMinutes: Number(event.target.value) })}>{[1, 3, 5, 10, 15].map((value) => <option key={value} value={value}>{value}분</option>)}</select></label>
             <label>휴식<select value={settings.restSeconds} onChange={(event) => setSettings({ ...settings, restSeconds: Number(event.target.value) })}>{[0, 15, 30, 45, 60, 120].map((value) => <option key={value} value={value}>{value}초</option>)}</select></label>
-            <label>시작 BPM<input inputMode="numeric" value={startBpm} onChange={(event) => setStartBpm(event.target.value.replace(/\D/g, ''))} /></label>
-            <label>최고 BPM<input inputMode="numeric" value={bestBpm} onChange={(event) => setBestBpm(event.target.value.replace(/\D/g, ''))} /></label>
+            <label>시작 BPM<input inputMode="numeric" value={startBpm} onChange={(event) => setStartBpm(normalizeBpmText(event.target.value))} /></label>
+            <label>최고 BPM<input inputMode="numeric" value={bestBpm} onChange={(event) => setBestBpm(normalizeBpmText(event.target.value))} /></label>
           </div>
           <label className="coach-check"><input type="checkbox" checked={settings.autoRest} onChange={(event) => setSettings({ ...settings, autoRest: event.target.checked })} />연주 구간 뒤 자동 휴식</label>
           <label>메모<textarea rows={2} value={note} onChange={(event) => setNote(event.target.value)} placeholder="오늘 불편했던 패턴이나 다음 목표" /></label>
@@ -181,6 +187,7 @@ export default function PracticeCoach() {
               {!history.length && <p>아직 저장된 연습 기록이 없습니다.</p>}
             </div>
           </details>
+          <p className="utility-note">최근 기록은 localStorage와 브라우저 IndexedDB에 함께 보관됩니다.</p>
         </section>
       )}
     </div>
